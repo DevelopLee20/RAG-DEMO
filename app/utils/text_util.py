@@ -1,5 +1,6 @@
 import re
 
+
 def preprocessing_text(text: str) -> str:
     """텍스트 전처리 함수
 
@@ -11,5 +12,5 @@ def preprocessing_text(text: str) -> str:
     """
     text = re.sub(r"[^ㄱ-ㅎㅏ-ㅣ가-힣a-zA-Z0-9()+\-*/=<>%., ]", "", text)
     text = re.sub(r" {2,}", " ", text)
-    
+
     return text
