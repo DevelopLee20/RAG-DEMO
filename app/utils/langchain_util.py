@@ -33,6 +33,11 @@ def get_chunks_to_text(texts: list[str]) -> list[Document]:
     return get_splitter().create_documents(texts=texts)
 
 def get_embedding() -> ClovaXEmbeddings:
+    """임베딩을 반환하는 함수
+
+    Returns:
+        ClovaXEmbeddings: 생성된 임베딩
+    """
     if embedding is None:
         embedding = ClovaXEmbeddings(
         model="bge-m3",
