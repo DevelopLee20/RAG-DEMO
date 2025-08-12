@@ -11,8 +11,9 @@ langchain-text-splitters = "*"
 langchain-naver = "*"
 langchain-community = "*"
 python-dotenv = "*"
-uvicorn = "*"
 python-multipart = "*"
+uvicorn = "*"
+faiss-cpu = "*"
 
 [dev-packages]
 
