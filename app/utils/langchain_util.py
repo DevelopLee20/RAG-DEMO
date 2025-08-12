@@ -22,7 +22,7 @@ def get_splitter() -> RecursiveCharacterTextSplitter:
     return splitter
 
 
-def create_chunks_to_text(texts: list[str]) -> list[Document]:
+async def create_chunks_to_text(texts: list[str]) -> list[Document]:
     """텍스트를 받아서 청크 리스트를 생성하는 함수
 
     Args:
@@ -34,7 +34,7 @@ def create_chunks_to_text(texts: list[str]) -> list[Document]:
     return get_splitter().create_documents(texts=texts)
 
 
-def get_embedding() -> ClovaXEmbeddings:
+async def get_embedding() -> ClovaXEmbeddings:
     """임베딩을 반환하는 함수
 
     Returns:

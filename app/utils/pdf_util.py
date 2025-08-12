@@ -1,10 +1,13 @@
+import io
+from typing import Any
+
 import PyPDF2
 from fastapi import UploadFile
 
 from app.utils.text_util import preprocessing_text
 
 
-def parse_pdf(file: str | UploadFile) -> list[str]:
+async def parse_pdf(file: str | UploadFile) -> list[str]:
     """pdf 파일 또는 UploadFile 스트림을 받아서 파싱 리스트 반환
 
     Args:
@@ -15,11 +18,13 @@ def parse_pdf(file: str | UploadFile) -> list[str]:
     """
     parse_list = []
 
+    pdf: Any
     # file의 타입에 따라 형식 변경
-    if type(file) == UploadFile:
-        pdf = file.file
-    else:
+    if isinstance(file, str):
         pdf = file
+    else:
+        pdf = await file.read()
+        pdf = io.BytesIO(pdf)
 
     for page in PyPDF2.PdfReader(pdf).pages:
         text = page.extract_text()

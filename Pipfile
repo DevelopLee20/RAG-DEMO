@@ -11,6 +11,8 @@ langchain-text-splitters = "*"
 langchain-naver = "*"
 langchain-community = "*"
 python-dotenv = "*"
+uvicorn = "*"
+python-multipart = "*"
 
 [dev-packages]
 
