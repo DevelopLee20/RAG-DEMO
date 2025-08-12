@@ -1,7 +1,11 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
+from langchain_naver import ClovaXEmbeddings
+
+from app.core.env import CLOVASTUDIO_API_TOKEN
 
 splitter = None
+embedding = None
 
 def get_splitter() -> RecursiveCharacterTextSplitter:
     """텍스트 파싱 스플리터 객체 반환
@@ -27,3 +31,13 @@ def get_chunks_to_text(texts: list[str]) -> list[Document]:
         list[Document]: 청크 리스트 객체
     """
     return get_splitter().create_documents(texts=texts)
+
+def get_embedding() -> ClovaXEmbeddings:
+    if embedding is None:
+        embedding = ClovaXEmbeddings(
+        model="bge-m3",
+        dimensions=1024,
+        api_key=CLOVASTUDIO_API_TOKEN,
+    )
+    
+    return embedding

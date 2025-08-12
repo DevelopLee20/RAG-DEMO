@@ -8,6 +8,9 @@ pre-commit = "*"
 fastapi = "*"
 pypdf2 = "*"
 langchain-text-splitters = "*"
+langchain-naver = "*"
+langchain-community = "*"
+python-dotenv = "*"
 
 [dev-packages]
 
