@@ -1,3 +1,4 @@
+import hashlib
 import os
 
 from fastapi import UploadFile
@@ -17,6 +18,8 @@ async def file_upload_service(file: UploadFile) -> tuple[int, str]:
 
     # 벡터 베이스에 저장
     file_basename, _ = os.path.splitext(file.filename)
-    await create_vector_store(name=file_basename, chunks=documents)
+    safe_folder_name = hashlib.sha256(file_basename.encode("utf-8")).hexdigest()
+
+    await create_vector_store(name=safe_folder_name, chunks=documents)
 
     return HTTP_200_OK, "저장 성공"

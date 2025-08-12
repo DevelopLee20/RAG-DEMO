@@ -22,7 +22,7 @@ async def create_vector_store(name: str, chunks: list[Document]):
             embedding=await get_embedding(),
         )
 
-    await vector_store.save_local(name)
+    vector_store.save_local(name)
 
 
 async def select_vector_store(name: str) -> FAISS:
