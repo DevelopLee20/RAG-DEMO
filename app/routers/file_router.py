@@ -11,3 +11,10 @@ async def upload_file(file: UploadFile) -> BaseResponseModel:
     status_code, detail = await file_service.file_upload_service(file=file)
 
     return BaseResponseModel(status_code=status_code, detail=detail)
+
+
+@router.get("/chat", response_model=BaseResponseModel)
+async def chat(name: str, query: str) -> BaseResponseModel:
+    status_code, detail = await file_service.chat_service(name=name, query=query)
+
+    return BaseResponseModel(status_code=status_code, detail=detail)

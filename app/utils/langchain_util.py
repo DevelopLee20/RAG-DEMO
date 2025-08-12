@@ -1,11 +1,14 @@
 from langchain_core.documents import Document
-from langchain_naver import ClovaXEmbeddings
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_naver import ChatClovaX, ClovaXEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.core.env import CLOVASTUDIO_API_TOKEN
 
 splitter = None
 embedding = None
+chain_clovaX = None
+clovaX = None
 
 
 def get_splitter() -> RecursiveCharacterTextSplitter:
@@ -50,3 +53,57 @@ async def get_embedding() -> ClovaXEmbeddings:
         )
 
     return embedding
+
+
+async def get_clovaX() -> ChatClovaX:
+    global clovaX
+
+    if clovaX is None:
+        clovaX = ChatClovaX(
+            model="HCX-003",
+            max_tokens=64,
+            api_key=CLOVASTUDIO_API_TOKEN,
+        )
+
+    return clovaX
+
+
+async def get_chain_clovaX():
+    global chain_clovaX
+
+    if chain_clovaX is None:
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    """아래 순서에 따라 사용자의 질문에 답변해주세요.
+                    1. [Context]를 참고해서 사용자의 질문에 대한 답을 생성
+                    2. 1에서 생성한 답이 질문에 대한 올바른 답인지 검토 후 답변
+
+                    조건
+                    - 가능한 단답형으로 대답해주세요.
+
+                    [Context]
+                    {results}
+                    """,
+                ),
+                ("human", "질문: {query}"),
+            ]
+        )
+
+        clova_model = await get_clovaX()
+        chain_clovaX = prompt | clova_model
+
+    return chain_clovaX
+
+
+async def use_chain_clovaX(chunk: list[Document], query: str) -> str:
+    chain = await get_chain_clovaX()
+
+    result = await chain.ainvoke(
+        {
+            "results": chunk,
+            "query": query,
+        }
+    )
+    return result.content
