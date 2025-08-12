@@ -1,4 +1,3 @@
-import io
 from typing import Any
 
 import PyPDF2
@@ -23,8 +22,7 @@ async def parse_pdf(file: str | UploadFile) -> list[str]:
     if isinstance(file, str):
         pdf = file
     else:
-        pdf = await file.read()
-        pdf = io.BytesIO(pdf)
+        pdf = file.file
 
     for page in PyPDF2.PdfReader(pdf).pages:
         text = page.extract_text()
