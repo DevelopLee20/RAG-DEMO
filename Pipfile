@@ -5,6 +5,8 @@ name = "pypi"
 
 [packages]
 pre-commit = "*"
+fastapi = "*"
+pypdf2 = "*"
 
 [dev-packages]
 
