@@ -56,6 +56,11 @@ async def get_embedding() -> ClovaXEmbeddings:
 
 
 async def get_clovaX() -> ChatClovaX:
+    """클로바엑스 객체 반환 함수
+
+    Returns:
+        ChatClovaX: 클로바엑스 객체
+    """
     global clovaX
 
     if clovaX is None:
@@ -69,6 +74,11 @@ async def get_clovaX() -> ChatClovaX:
 
 
 async def get_chain_clovaX():
+    """클로바엑스 프롬프트 체인 객체 반환 함수
+
+    Returns:
+        Chain: 모델과 프롬프트 체인 객체
+    """
     global chain_clovaX
 
     if chain_clovaX is None:
@@ -98,6 +108,16 @@ async def get_chain_clovaX():
 
 
 async def use_chain_clovaX(chunk: list[Document], query: str) -> str:
+    """체이닝된 클로바엑스 객체 사용 함수
+
+
+    Args:
+        chunk (list[Document]): 가장 유사도 높은 청크
+        query (str): 질문
+
+    Returns:
+        str: 질문에 대한 대답
+    """
     chain = await get_chain_clovaX()
 
     result = await chain.ainvoke(

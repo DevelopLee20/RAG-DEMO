@@ -10,6 +10,14 @@ from app.utils.pdf_util import parse_pdf
 
 
 async def file_upload_service(file: UploadFile) -> tuple[int, str]:
+    """파일 업로드 서비스
+
+    Args:
+        file (UploadFile): 업로드된 파일 객체
+
+    Returns:
+        tuple[int, str]: 상태 코드와 메시지
+    """
     # PDF 파싱
     parse_text = await parse_pdf(file=file)
 
@@ -26,6 +34,15 @@ async def file_upload_service(file: UploadFile) -> tuple[int, str]:
 
 
 async def chat_service(name: str, query: str) -> tuple[int, str]:
+    """채팅 서비스
+
+    Args:
+        name (str): 벡터 스토어 이름
+        query (str): 질문
+
+    Returns:
+        tuple[int, str]: 상태코드와 메시지
+    """
     vector_store = await select_vector_store(name=name)
 
     if vector_store is None:
