@@ -1,5 +1,7 @@
 from fastapi import APIRouter, UploadFile
 
+from fastapi.responses import StreamingResponse
+
 from app.core.base_response import BaseResponseModel, ListResponseModel
 from app.services import file_service
 
@@ -25,3 +27,11 @@ async def get_pdf_file_list() -> ListResponseModel:
     status_code, detail, data = await file_service.get_pdf_file_list()
 
     return ListResponseModel(status_code=status_code, detail=detail, data=data)
+
+
+@router.get("/stream")
+async def chat_stream(name : str, query :str):
+    return StreamingResponse(
+        file_service.chat_stream_service(name = name, query = query), 
+        media_type = "text/event-stream"
+    )

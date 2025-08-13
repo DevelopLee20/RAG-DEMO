@@ -31,7 +31,11 @@ function App() {
   };
 
   const handleFileSelect = (file) => {
-    setSelectedFile(file);
+   if (selectedFile && selectedFile === file) {
+      setSelectedFile(null);
+    } else {
+      setSelectedFile(file);
+    }
   };
 
   return (
@@ -43,8 +47,8 @@ function App() {
           <div className="w-full md:w-1/3 flex flex-col gap-8">
             <div className="bg-white p-6 rounded-lg shadow-md">
               <h2 className="text-xl font-bold mb-4">Upload PDF</h2>
-              <FileUpload onUploadSuccess={handleUploadSuccess} />
-            </div>
+             <FileUpload onUploadSuccess={handleUploadSuccess} />
+            </div> 
             <div className="bg-white p-6 rounded-lg shadow-md">
               <h2 className="text-xl font-bold mb-4">Select File</h2>
               <FileList files={files} onFileSelect={handleFileSelect} selectedFile={selectedFile} />
