@@ -28,7 +28,7 @@ const PdfViewer = ({ file }) => {
         onLoadError={(error) => console.error('Error while loading PDF:', error)}
       >
         {Array.from(new Array(numPages), (el, index) => (
-          <Page key={`page_${index + 1}`} pageNumber={index + 1} />
+          <Page key={`page_${index + 1}`} pageNumber={index + 1} width={800} />
         ))}
       </Document>
     </div>
