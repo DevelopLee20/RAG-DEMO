@@ -21,7 +21,7 @@ const PdfViewer = ({ file }) => {
   const fileUrl = `http://127.0.0.1:8000/files/${encodeURIComponent(file)}`;
 
   return (
-    <div>
+    <div className="pdf-viewer-container" style={{ maxHeight: '600px', overflowY: 'auto', border: '1px solid #ccc' }}>
       <Document
         file={fileUrl}
         onLoadSuccess={onDocumentLoadSuccess}
