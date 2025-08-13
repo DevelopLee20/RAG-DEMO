@@ -1,3 +1,5 @@
+import os
+
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 
@@ -22,7 +24,8 @@ async def create_vector_store(name: str, chunks: list[Document]):
             embedding=await get_embedding(),
         )
 
-    vector_store.save_local(name)
+    os.makedirs("./vector_db/", exist_ok=True)
+    vector_store.save_local("./vector_db/" + name)
 
 
 async def select_vector_store(name: str) -> FAISS | None:
@@ -36,7 +39,7 @@ async def select_vector_store(name: str) -> FAISS | None:
     """
     try:
         return FAISS.load_local(
-            name,
+            "./vector_db/" + name,
             await get_embedding(),
             allow_dangerous_deserialization=True,  # pickle 파일 로드 허용
         )
