@@ -2,6 +2,7 @@ from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_naver import ChatClovaX, ClovaXEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.chat_message_histories import ChatMessageHistory
 
 
 from app.core.env import CLOVASTUDIO_API_TOKEN

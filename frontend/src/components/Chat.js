@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
 const Chat = ({ selectedFile }) => {
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [response, setResponse] = useState('');
+  const [messages, setMessages] = useState([]); // 이전 메시지까지 누적
   const [error, setError] = useState('');
+
+  // 세션 ID를 한 번 생성해서 유지
+  const sessionIdRef = useRef(`sess_${Math.random().toString(36).substr(2, 9)}`);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -19,21 +22,38 @@ const Chat = ({ selectedFile }) => {
     }
 
     setIsLoading(true);
-    setResponse('');
     setError('');
 
+    // 사용자가 보낸 메시지 기록 추가
+    setMessages((prev) => [...prev, { role: 'user', content: query }]);
+
     try {
-      const url = `http://127.0.0.1:8000/stream?name=${encodeURIComponent(selectedFile)}&query=${encodeURIComponent(query)}`;
+      const url = `http://127.0.0.1:8000/stream?name=${encodeURIComponent(selectedFile)}&query=${encodeURIComponent(query)}&session_id=${sessionIdRef.current}`;
       const eventSource = new EventSource(url);
 
-      // 서버에서 data 이벤트가 올 때마다 실행
+      let aiMessage = ''; // 스트리밍 중인 AI 메시지 누적
+
       eventSource.onmessage = (event) => {
+        console.debug('SSE message:', event.data);
         if (event.data === '[DONE]') {
           eventSource.close();
+          // 최종 완료 시 로딩 해제만 수행 (실시간으로 이미 메시지를 반영함)
           setIsLoading(false);
+          aiMessage = '';
         } else {
-          // 토큰 누적
-          setResponse((prev) => prev + event.data);
+          aiMessage += event.data;
+          // 실시간으로 마지막 AI 메시지 업데이트 (없으면 새로 추가)
+          setMessages((prev) => {
+            if (prev.length > 0 && prev[prev.length - 1].role === 'ai') {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...updated[updated.length - 1],
+                content: updated[updated.length - 1].content + event.data,
+              };
+              return updated;
+            }
+            return [...prev, { role: 'ai', content: event.data }];
+          });
         }
       };
 
@@ -47,6 +67,8 @@ const Chat = ({ selectedFile }) => {
       setError(`Error: ${err.message}`);
       setIsLoading(false);
     }
+
+    setQuery(''); // 입력창 초기화
   };
 
   return (
@@ -77,10 +99,15 @@ const Chat = ({ selectedFile }) => {
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-      {response && (
+      {messages.length > 0 && (
         <div className="mt-4 p-4 bg-gray-100 rounded-lg">
-          <h4 className="font-semibold">Response:</h4>
-          <p className="text-gray-800 whitespace-pre-wrap">{response}</p>
+          <h4 className="font-semibold">Chat History:</h4>
+          {messages.map((msg, idx) => (
+            <p key={idx} className={`text-gray-800 whitespace-pre-wrap ${msg.role === 'ai' ? 'font-bold' : ''}`}>
+              {msg.role === 'ai' ? 'AI: ' : 'You: '}
+              {msg.content}
+            </p>
+          ))}
         </div>
       )}
     </div>
