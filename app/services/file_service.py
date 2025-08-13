@@ -7,7 +7,7 @@ from starlette.status import HTTP_200_OK, HTTP_404_NOT_FOUND
 from app.db.text_db import find_safe_name_by_name, read_text_db, write_text_db
 from app.db.vector_db import create_vector_store, select_vector_store
 from app.utils.langchain_util import create_chunks_to_text, use_chain_clovaX
-from app.utils.pdf_util import parse_pdf
+from app.utils.pdf_util import parse_pdf, save_pdf
 
 
 async def file_upload_service(file: UploadFile) -> tuple[int, str]:
@@ -19,15 +19,18 @@ async def file_upload_service(file: UploadFile) -> tuple[int, str]:
     Returns:
         tuple[int, str]: 상태 코드와 메시지
     """
+    # 저장 이름 설정
+    file_basename, _ = os.path.splitext(file.filename)
+    safe_folder_name = hashlib.sha256(file_basename.encode("utf-8")).hexdigest()
+
     # PDF 파싱
     parse_text = await parse_pdf(file=file)
 
+    # PDF 저장
+    await save_pdf(file=file, safe_name=safe_folder_name)
+
     # 청킹
     documents = await create_chunks_to_text(parse_text)
-
-    # 벡터 베이스에 저장
-    file_basename, _ = os.path.splitext(file.filename)
-    safe_folder_name = hashlib.sha256(file_basename.encode("utf-8")).hexdigest()
 
     # 텍스트 디비에 이름, 안전 이름 쌍 저장
     await write_text_db(file_basename, safe_folder_name)
