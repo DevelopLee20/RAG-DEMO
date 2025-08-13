@@ -42,14 +42,24 @@ async def read_text_db() -> list[list[str]]:
 
 async def write_text_db(name: str, safe_name: str) -> None:
     """
-    텍스트 파일 데이터베이스에 새 이름/안전한 이름 쌍을 추가합니다.
+    텍스트 파일 데이터베이스에 이름/안전한 이름 쌍을 쓰거나 업데이트합니다.
+    이름이 이미 있으면 safe_name을 덮어쓰고, 그렇지 않으면 새 쌍을 추가합니다.
 
     Args:
         name: 원본 이름입니다.
         safe_name: 저장할 안전한 이름입니다.
     """
-    with open(DB_FILE_PATH, "a", encoding="utf-8") as f:
-        f.write(f"{name},{safe_name};")
+    db_data = await read_text_db()
+    data_dict = {entry[0]: entry[1] for entry in db_data}
+
+    data_dict[name] = safe_name
+
+    new_content = ";".join([f"{n},{s}" for n, s in data_dict.items()])
+    if new_content:
+        new_content += ";"
+
+    with open(DB_FILE_PATH, "w", encoding="utf-8") as f:
+        f.write(new_content)
 
 
 async def find_safe_name_by_name(name: str) -> str | None:
