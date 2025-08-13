@@ -25,7 +25,7 @@ async def create_vector_store(name: str, chunks: list[Document]):
     vector_store.save_local(name)
 
 
-async def select_vector_store(name: str) -> FAISS:
+async def select_vector_store(name: str) -> FAISS | None:
     """벡터 스토어를 불러오는 함수
 
     Args:
@@ -34,8 +34,11 @@ async def select_vector_store(name: str) -> FAISS:
     Returns:
         FAISS: 벡터 스토어 객체
     """
-    return FAISS.load_local(
-        name,
-        await get_embedding(),
-        allow_dangerous_deserialization=True,  # pickle 파일 로드 허용
-    )
+    try:
+        return FAISS.load_local(
+            name,
+            await get_embedding(),
+            allow_dangerous_deserialization=True,  # pickle 파일 로드 허용
+        )
+    except Exception as e:
+        return None

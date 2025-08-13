@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile
 
-from app.core.base_response import BaseResponseModel
+from app.core.base_response import BaseResponseModel, ListResponseModel
 from app.services import file_service
 
 router = APIRouter(prefix="")
@@ -18,3 +18,10 @@ async def chat(name: str, query: str) -> BaseResponseModel:
     status_code, detail = await file_service.chat_service(name=name, query=query)
 
     return BaseResponseModel(status_code=status_code, detail=detail)
+
+
+@router.get("/list", response_model=ListResponseModel)
+async def get_pdf_file_list() -> ListResponseModel:
+    status_code, detail, data = await file_service.get_pdf_file_list()
+
+    return ListResponseModel(status_code=status_code, detail=detail, data=data)

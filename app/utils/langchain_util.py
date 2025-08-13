@@ -66,7 +66,7 @@ async def get_clovaX() -> ChatClovaX:
     if clovaX is None:
         clovaX = ChatClovaX(
             model="HCX-003",
-            max_tokens=64,
+            max_tokens=128,
             api_key=CLOVASTUDIO_API_TOKEN,
         )
 
