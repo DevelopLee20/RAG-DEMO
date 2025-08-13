@@ -1,6 +1,5 @@
-from fastapi import APIRouter, UploadFile
-
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 
 from app.core.base_response import BaseResponseModel, ListResponseModel
 from app.services import file_service
@@ -29,9 +28,17 @@ async def get_pdf_file_list() -> ListResponseModel:
     return ListResponseModel(status_code=status_code, detail=detail, data=data)
 
 
+@router.get("/files/{file_name}")
+async def get_file(file_name: str):
+    file_path = await file_service.get_file_path_service(name=file_name)
+    if file_path is None:
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(file_path)
+
+
 @router.get("/stream")
-async def chat_stream(name : str, query :str):
+async def chat_stream(name: str, query: str):
     return StreamingResponse(
-        file_service.chat_stream_service(name = name, query = query), 
-        media_type = "text/event-stream"
+        file_service.chat_stream_service(name=name, query=query),
+        media_type="text/event-stream",
     )

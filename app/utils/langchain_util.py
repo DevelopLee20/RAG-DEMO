@@ -3,7 +3,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_naver import ChatClovaX, ClovaXEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-
 from app.core.env import CLOVASTUDIO_API_TOKEN
 
 splitter = None
@@ -120,7 +119,6 @@ async def use_chain_clovaX(chunk: list[Document], query: str) -> str:
         str: 질문에 대한 대답
     """
     chain = await get_chain_clovaX()
-
 
     result = await chain.ainvoke(
         {

@@ -3,6 +3,7 @@ import Header from './components/Header';
 import FileUpload from './components/FileUpload';
 import FileList from './components/FileList';
 import Chat from './components/Chat';
+import PdfViewer from './components/PdfViewer';
 
 function App() {
   const [files, setFiles] = useState([]);
@@ -56,10 +57,14 @@ function App() {
           </div>
 
           {/* Right Column */}
-          <div className="w-full md:w-2/3">
+          <div className="w-full md:w-2/3 flex flex-col gap-8">
             <div className="bg-white p-6 rounded-lg shadow-md">
               <h2 className="text-xl font-bold mb-4">Chat</h2>
               <Chat selectedFile={selectedFile} />
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-xl font-bold mb-4">PDF Viewer</h2>
+              <PdfViewer file={selectedFile} />
             </div>
           </div>
         </div>
