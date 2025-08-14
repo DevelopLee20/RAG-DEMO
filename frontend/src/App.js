@@ -39,6 +39,31 @@ function App() {
     }
   };
 
+  const handleFileDelete = async (fileName) => {
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/files/${fileName}`, {
+        method: 'DELETE',
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        // 삭제된 파일이 현재 선택된 파일이면 선택 해제
+        if (selectedFile === fileName) {
+          setSelectedFile(null);
+        }
+        // 파일 목록 새로고침
+        fetchFiles();
+        alert('파일이 성공적으로 삭제되었습니다.');
+      } else {
+        alert(`파일 삭제 실패: ${data.detail}`);
+      }
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      alert('파일 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
   return (
     <div className="bg-gray-100 min-h-screen font-sans">
       <Header />
@@ -52,7 +77,12 @@ function App() {
             </div> 
             <div className="bg-white p-6 rounded-lg shadow-md">
               <h2 className="text-xl font-bold mb-4">Select File</h2>
-              <FileList files={files} onFileSelect={handleFileSelect} selectedFile={selectedFile} />
+              <FileList 
+                files={files} 
+                onFileSelect={handleFileSelect} 
+                selectedFile={selectedFile}
+                onFileDelete={handleFileDelete}
+              />
             </div>
           </div>
 
