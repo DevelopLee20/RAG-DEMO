@@ -76,7 +76,7 @@ async def delete_text_db(name: str) -> bool:
         db_data = await read_text_db()
         # 삭제할 이름을 제외한 데이터만 유지
         filtered_data = [entry for entry in db_data if entry[0] != name]
-        
+
         # 새로운 내용 생성
         new_content = ";".join([f"{n},{s}" for n, s in filtered_data])
         if new_content:
@@ -84,7 +84,7 @@ async def delete_text_db(name: str) -> bool:
 
         with open(DB_FILE_PATH, "w", encoding="utf-8") as f:
             f.write(new_content)
-        
+
         return True
     except Exception as e:
         print(f"Error deleting from text db: {e}")

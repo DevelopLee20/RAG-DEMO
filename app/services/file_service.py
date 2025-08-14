@@ -7,9 +7,19 @@ from fastapi import UploadFile
 from langchain_community.chat_message_histories import ChatMessageHistory
 from starlette.status import HTTP_200_OK, HTTP_404_NOT_FOUND
 
-from app.db.text_db import find_safe_name_by_name, read_text_db, write_text_db
-from app.db.vector_db import create_vector_store, select_vector_store
+from app.db.text_db import (
+    delete_text_db,
+    find_safe_name_by_name,
+    read_text_db,
+    write_text_db,
+)
+from app.db.vector_db import (
+    create_vector_store,
+    delete_vector_store,
+    select_vector_store,
+)
 from app.utils.langchain_util import (
+    add_to_history,
     create_chunks_to_text,
     get_chain_clovaX,
     get_langfuse_handler,
@@ -83,6 +93,7 @@ async def file_delete_service(name: str) -> tuple[int, str]:
 
     return HTTP_200_OK, "삭제 성공"
 
+
 async def chat_service(
     name: str, query: str, session_id: str = "default"
 ) -> tuple[int, str]:
@@ -107,10 +118,10 @@ async def chat_service(
 
     # AI 응답 생성
     result = await use_chain_clovaX(chunk=chunk, query=query)
-    
+
     # 히스토리에 추가
     await add_to_history(session_id=session_id, query=query, response=result)
-    
+
     # 반환
     return HTTP_200_OK, result
 
@@ -133,7 +144,10 @@ async def get_file_path_service(name: str) -> str | None:
         return file_path
     return None
 
-async def chat_stream_service(name: str, query: str, session_id : str) -> AsyncGenerator[str, None]:
+
+async def chat_stream_service(
+    name: str, query: str, session_id: str
+) -> AsyncGenerator[str, None]:
     """스트리밍 채팅 서비스
 
     Args:
@@ -147,7 +161,7 @@ async def chat_stream_service(name: str, query: str, session_id : str) -> AsyncG
     safe_name = await find_safe_name_by_name(name=name)
     vector_store = await select_vector_store(name=safe_name)
     chain = await get_chain_clovaX()
-   
+
     if vector_store is None:
         yield "data: 선택한 파일의 벡터 스토어가 존재하지 않습니다. 파일을 다시 선택하거나 업로드하세요.\n\n"
         yield "data: [DONE]\n\n"
@@ -187,5 +201,5 @@ async def chat_stream_service(name: str, query: str, session_id : str) -> AsyncG
     full_content = "".join(accumulated_content)
     if full_content:
         await add_to_history(session_id=session_id, query=query, response=full_content)
-    
+
     yield "data: [DONE]\n\n"
