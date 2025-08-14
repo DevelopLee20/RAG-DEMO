@@ -12,6 +12,7 @@ from app.db.vector_db import create_vector_store, select_vector_store
 from app.utils.langchain_util import (
     create_chunks_to_text,
     get_chain_clovaX,
+    get_langfuse_handler,
     use_chain_clovaX,
 )
 from app.utils.pdf_util import parse_pdf, save_pdf
@@ -136,11 +137,17 @@ async def chat_stream_service(
     # 스트리밍 응답 누적 버퍼
     accumulated_content: list[str] = []
 
+    # 핸들러 불러오기
+    handler = await get_langfuse_handler()
+
     async for event in chain.astream(
         {
             "results": chunk,
             "query": query,
-        }
+        },
+        config={
+            "callbacks": [handler],
+        },
     ):
         if event and hasattr(event, "content"):
             for text in event.content:
