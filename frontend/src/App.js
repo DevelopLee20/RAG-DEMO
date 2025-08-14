@@ -42,7 +42,7 @@ function App() {
   return (
     <div className="bg-gray-100 min-h-screen font-sans">
       <Header />
-      <main className="container mx-auto p-4">
+      <main className="container mx-auto p-4" style={{"maxWidth": "100%"}}>
         <div className="flex flex-col md:flex-row gap-8">
           {/* Left Column */}
           <div className="w-full md:w-1/3 flex flex-col gap-8">
