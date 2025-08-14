@@ -37,7 +37,7 @@ async def get_file(file_name: str):
 
 
 @router.get("/stream")
-async def chat_stream(name : str, query :str, session_id :str):
+async def chat_stream(name: str, query: str, session_id: str):
     headers = {
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",

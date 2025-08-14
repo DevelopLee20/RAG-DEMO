@@ -2,13 +2,20 @@ from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_naver import ChatClovaX, ClovaXEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langfuse.callback import CallbackHandler
 
-from app.core.env import CLOVASTUDIO_API_TOKEN
+from app.core.env import (
+    CLOVASTUDIO_API_TOKEN,
+    LANGFUSE_HOST,
+    LANGFUSE_PUBLIC_KEY,
+    LANGFUSE_SECRET_KEY,
+)
 
 splitter = None
 embedding = None
 chain_clovaX = None
 clovaX = None
+langfuse_handler = None
 
 
 def get_splitter() -> RecursiveCharacterTextSplitter:
@@ -109,6 +116,24 @@ async def get_chain_clovaX():
     return chain_clovaX
 
 
+async def get_langfuse_handler() -> CallbackHandler:
+    """랭퓨즈 클라이언트 반환 함수
+
+    Returns:
+        CallbackHandler: 랭퓨즈 클라이언트 객체
+    """
+    global langfuse_handler
+
+    if langfuse_handler is None:
+        langfuse_handler = CallbackHandler(
+            public_key=LANGFUSE_PUBLIC_KEY,
+            secret_key=LANGFUSE_SECRET_KEY,
+            host=LANGFUSE_HOST,
+        )
+
+    return langfuse_handler
+
+
 async def use_chain_clovaX(chunk: list[Document], query: str) -> str:
     """체이닝된 클로바엑스 객체 사용 함수
 
@@ -121,11 +146,16 @@ async def use_chain_clovaX(chunk: list[Document], query: str) -> str:
         str: 질문에 대한 대답
     """
     chain = await get_chain_clovaX()
+    handler = await get_langfuse_handler()
 
     result = await chain.ainvoke(
         {
             "results": chunk,
             "query": query,
-        }
+        },
+        config={
+            "callbacks": [handler],
+        },
     )
+
     return result.content
