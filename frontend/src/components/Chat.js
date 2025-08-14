@@ -100,14 +100,33 @@ const Chat = ({ selectedFile }) => {
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
       {messages.length > 0 && (
-        <div className="mt-4 p-4 bg-gray-100 rounded-lg">
-          <h4 className="font-semibold">Chat History:</h4>
-          {messages.map((msg, idx) => (
-            <p key={idx} className={`text-gray-800 whitespace-pre-wrap ${msg.role === 'ai' ? 'font-bold' : ''}`}>
-              {msg.role === 'ai' ? 'AI: ' : 'You: '}
-              {msg.content}
-            </p>
-          ))}
+        <div className="mt-4">
+          <h4 className="font-semibold text-gray-800 mb-2">Chat History:</h4>
+          <div className="h-96 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50">
+            <div className="space-y-4">
+              {messages.slice().reverse().map((msg, idx) => (
+                <div
+                  key={messages.length - 1 - idx}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                      msg.role === 'user'
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-200 text-gray-800'
+                    }`}
+                  >
+                    <div className="text-xs font-medium mb-1 opacity-75">
+                      {msg.role === 'user' ? 'You' : 'AI'}
+                    </div>
+                    <div className="whitespace-pre-wrap text-sm">
+                      {msg.content}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
