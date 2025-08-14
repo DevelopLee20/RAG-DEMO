@@ -1,14 +1,35 @@
+import asyncio
 import hashlib
 import os
 from collections.abc import AsyncGenerator
 
 from fastapi import UploadFile
+from langchain_community.chat_message_histories import ChatMessageHistory
 from starlette.status import HTTP_200_OK, HTTP_404_NOT_FOUND
 
-from app.db.text_db import find_safe_name_by_name, read_text_db, write_text_db, delete_text_db
-from app.db.vector_db import create_vector_store, select_vector_store, delete_vector_store
-from app.utils.langchain_util import create_chunks_to_text, use_chain_clovaX, stream_chain_clovaX_raw, add_to_history
-from app.utils.pdf_util import parse_pdf, save_pdf, UPLOAD_DIRECTORY
+from app.db.text_db import find_safe_name_by_name, read_text_db, write_text_db
+from app.db.vector_db import create_vector_store, select_vector_store
+from app.utils.langchain_util import (
+    create_chunks_to_text,
+    get_chain_clovaX,
+    get_langfuse_handler,
+    use_chain_clovaX,
+)
+from app.utils.pdf_util import parse_pdf, save_pdf
+
+UPLOAD_DIRECTORY = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "uploaded_files")
+)
+
+# 채팅 히스토리 저장용
+store = {}
+
+
+def get_session_history(session_id: str) -> ChatMessageHistory:
+    if session_id not in store:
+        store[session_id] = ChatMessageHistory()
+    return store[session_id]
+
 
 async def file_upload_service(file: UploadFile) -> tuple[int, str]:
     """파일 업로드 서비스
@@ -62,7 +83,9 @@ async def file_delete_service(name: str) -> tuple[int, str]:
 
     return HTTP_200_OK, "삭제 성공"
 
-async def chat_service(name: str, query: str, session_id :str = "default") -> tuple[int, str]:
+async def chat_service(
+    name: str, query: str, session_id: str = "default"
+) -> tuple[int, str]:
     """채팅 서비스
 
     Args:
@@ -98,6 +121,7 @@ async def get_pdf_file_list() -> tuple[int, str, list[str]]:
 
     return HTTP_200_OK, "리스트 조회 성공", file_names
 
+
 async def get_file_path_service(name: str) -> str | None:
     file_basename, _ = os.path.splitext(name)
     safe_name = await find_safe_name_by_name(name=file_basename)
@@ -122,23 +146,44 @@ async def chat_stream_service(name: str, query: str, session_id : str) -> AsyncG
     """
     safe_name = await find_safe_name_by_name(name=name)
     vector_store = await select_vector_store(name=safe_name)
-    
+    chain = await get_chain_clovaX()
+   
     if vector_store is None:
         yield "data: 선택한 파일의 벡터 스토어가 존재하지 않습니다. 파일을 다시 선택하거나 업로드하세요.\n\n"
         yield "data: [DONE]\n\n"
         return
-    
+
     chunk = vector_store.similarity_search(query=query)
+
+    # 세션 히스토리 가져오기
+    history = get_session_history(session_id)
+    # 사용자 질의 저장
+    history.add_user_message(query)
 
     # 스트리밍 응답 누적 버퍼
     accumulated_content: list[str] = []
 
-    # 스트리밍 처리
-    async for content in stream_chain_clovaX_raw(chunk=chunk, query=query):
-        accumulated_content.append(content)
-        yield f"data: {content}\n\n"
+    # 핸들러 불러오기
+    handler = await get_langfuse_handler()
 
-    # 히스토리에 추가 (전체 내용)
+    async for event in chain.astream(
+        {
+            "results": chunk,
+            "query": query,
+        },
+        config={
+            "callbacks": [handler],
+        },
+    ):
+        if event and hasattr(event, "content"):
+            for text in event.content:
+                for t in text:
+                    yield f"data: {t}\n\n"
+                    await asyncio.sleep(0.02)
+
+            # yield f"data: {event.content}\n\n"
+
+    # ai 답변 저장 (전체 내용)
     full_content = "".join(accumulated_content)
     if full_content:
         await add_to_history(session_id=session_id, query=query, response=full_content)

@@ -3,17 +3,23 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_naver import ChatClovaX, ClovaXEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.chat_message_histories import ChatMessageHistory
-from langfuse.callback import CallbackHandler
 from langfuse import Langfuse
-from collections.abc import AsyncGenerator
 import os
 
-from app.core.env import CLOVASTUDIO_API_TOKEN, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST, LANGFUSE_PROJECT_ID, LANGFUSE_ORG_ID
+from langfuse.callback import CallbackHandler
+
+from app.core.env import (
+    CLOVASTUDIO_API_TOKEN,
+    LANGFUSE_HOST,
+    LANGFUSE_PUBLIC_KEY,
+    LANGFUSE_SECRET_KEY,
+)
 
 splitter = None
 embedding = None
 chain_clovaX = None
 clovaX = None
+langfuse_handler = None
 
 langfuseHandler = CallbackHandler(
   secret_key=LANGFUSE_SECRET_KEY,
@@ -109,11 +115,13 @@ async def get_chain_clovaX():
                 (
                     "system",
                     """아래 순서에 따라 사용자의 질문에 답변해주세요.
-                    1. [Context]를 참고해서 사용자의 질문에 대한 답을 생성
-                    2. 1에서 생성한 답이 질문에 대한 올바른 답인지 검토 후 답변
+                    1. [Context]를 참고해서 사용자의 질문에 대한 답을 생성해주세요.
+                    2. 1에서 생성한 답이 문서에 존재하는지 검토 후 답변해주세요.
+                    3. 2에서 생성한 답이 질문에 대한 올바른 대답인지 검토 후 답변해주세요.
 
                     조건
                     - 가능한 단답형으로 대답해주세요.
+                    - 만약 3에서 생성한 답이 문서에 존재하지 않는다면 "문서에 없음" 이라고 답변해주세요.
 
                     [Context]
                     {results}
@@ -128,6 +136,23 @@ async def get_chain_clovaX():
 
     return chain_clovaX
 
+async def get_langfuse_handler() -> CallbackHandler:
+    """랭퓨즈 클라이언트 반환 함수
+
+    Returns:
+        CallbackHandler: 랭퓨즈 클라이언트 객체
+    """
+    global langfuse_handler
+
+    if langfuse_handler is None:
+        langfuse_handler = CallbackHandler(
+            public_key=LANGFUSE_PUBLIC_KEY,
+            secret_key=LANGFUSE_SECRET_KEY,
+            host=LANGFUSE_HOST,
+        )
+
+    return langfuse_handler
+
 async def use_chain_clovaX(chunk: list[Document], query: str) -> str:
     """체이닝된 클로바엑스 객체 사용 함수
 
@@ -139,6 +164,7 @@ async def use_chain_clovaX(chunk: list[Document], query: str) -> str:
         str: 질문에 대한 대답
     """
     chain = await get_chain_clovaX()
+    handler = await get_langfuse_handler()
 
     result = await chain.ainvoke(
         {
@@ -152,30 +178,6 @@ async def use_chain_clovaX(chunk: list[Document], query: str) -> str:
     )
     return result.content
 
-async def stream_chain_clovaX_raw(chunk: list[Document], query: str) -> AsyncGenerator[str, None]:
-    """스트리밍 방식으로 체이닝된 클로바엑스 객체 사용 함수 (원시 텍스트 반환)
-
-    Args:
-        chunk (list[Document]): 가장 유사도 높은 청크
-        query (str): 질문
-
-    Yields:
-        str: 원시 텍스트 응답
-    """
-    chain = await get_chain_clovaX()
-    
-    async for event in chain.astream(
-        {
-            "results": chunk,
-            "query": query,
-        },
-        config={
-            "callbacks": [langfuseHandler]
-        }
-    ):
-        if event and hasattr(event, "content"):
-            yield event.content
-
 async def add_to_history(session_id: str, query: str, response: str):
     """세션 히스토리에 대화 내용을 추가하는 함수
 
@@ -187,4 +189,3 @@ async def add_to_history(session_id: str, query: str, response: str):
     history = get_session_history(session_id)
     history.add_user_message(query)
     history.add_ai_message(response)
-
