@@ -104,7 +104,7 @@ const Chat = ({ selectedFile }) => {
           <h4 className="font-semibold text-gray-800 mb-2">Chat History:</h4>
           <div className="h-96 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50">
             <div className="space-y-4">
-              {messages.slice().reverse().map((msg, idx) => (
+              {messages.slice().map((msg, idx) => (
                 <div
                   key={messages.length - 1 - idx}
                   className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}

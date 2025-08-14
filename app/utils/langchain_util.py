@@ -2,14 +2,20 @@ from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_naver import ChatClovaX, ClovaXEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.chat_message_histories import ChatMessageHistory
+from langfuse.callback import CallbackHandler
 
-from app.core.env import CLOVASTUDIO_API_TOKEN
+from app.core.env import (
+    CLOVASTUDIO_API_TOKEN,
+    LANGFUSE_HOST,
+    LANGFUSE_PUBLIC_KEY,
+    LANGFUSE_SECRET_KEY,
+)
 
 splitter = None
 embedding = None
 chain_clovaX = None
 clovaX = None
+langfuse_handler = None
 
 
 def get_splitter() -> RecursiveCharacterTextSplitter:
@@ -88,11 +94,13 @@ async def get_chain_clovaX():
                 (
                     "system",
                     """아래 순서에 따라 사용자의 질문에 답변해주세요.
-                    1. [Context]를 참고해서 사용자의 질문에 대한 답을 생성
-                    2. 1에서 생성한 답이 질문에 대한 올바른 답인지 검토 후 답변
+                    1. [Context]를 참고해서 사용자의 질문에 대한 답을 생성해주세요.
+                    2. 1에서 생성한 답이 문서에 존재하는지 검토 후 답변해주세요.
+                    3. 2에서 생성한 답이 질문에 대한 올바른 대답인지 검토 후 답변해주세요.
 
                     조건
                     - 가능한 단답형으로 대답해주세요.
+                    - 만약 3에서 생성한 답이 문서에 존재하지 않는다면 "문서에 없음" 이라고 답변해주세요.
 
                     [Context]
                     {results}
@@ -108,6 +116,24 @@ async def get_chain_clovaX():
     return chain_clovaX
 
 
+async def get_langfuse_handler() -> CallbackHandler:
+    """랭퓨즈 클라이언트 반환 함수
+
+    Returns:
+        CallbackHandler: 랭퓨즈 클라이언트 객체
+    """
+    global langfuse_handler
+
+    if langfuse_handler is None:
+        langfuse_handler = CallbackHandler(
+            public_key=LANGFUSE_PUBLIC_KEY,
+            secret_key=LANGFUSE_SECRET_KEY,
+            host=LANGFUSE_HOST,
+        )
+
+    return langfuse_handler
+
+
 async def use_chain_clovaX(chunk: list[Document], query: str) -> str:
     """체이닝된 클로바엑스 객체 사용 함수
 
@@ -120,11 +146,16 @@ async def use_chain_clovaX(chunk: list[Document], query: str) -> str:
         str: 질문에 대한 대답
     """
     chain = await get_chain_clovaX()
+    handler = await get_langfuse_handler()
 
     result = await chain.ainvoke(
         {
             "results": chunk,
             "query": query,
-        }
+        },
+        config={
+            "callbacks": [handler],
+        },
     )
+
     return result.content
