@@ -2,7 +2,6 @@ from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_naver import ChatClovaX, ClovaXEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.chat_message_histories import ChatMessageHistory
 
 from app.core.env import CLOVASTUDIO_API_TOKEN
 
@@ -88,11 +87,13 @@ async def get_chain_clovaX():
                 (
                     "system",
                     """아래 순서에 따라 사용자의 질문에 답변해주세요.
-                    1. [Context]를 참고해서 사용자의 질문에 대한 답을 생성
-                    2. 1에서 생성한 답이 질문에 대한 올바른 답인지 검토 후 답변
+                    1. [Context]를 참고해서 사용자의 질문에 대한 답을 생성해주세요.
+                    2. 1에서 생성한 답이 문서에 존재하는지 검토 후 답변해주세요.
+                    3. 2에서 생성한 답이 질문에 대한 올바른 대답인지 검토 후 답변해주세요.
 
                     조건
                     - 가능한 단답형으로 대답해주세요.
+                    - 만약 3에서 생성한 답이 문서에 존재하지 않는다면 "문서에 없음" 이라고 답변해주세요.
 
                     [Context]
                     {results}
