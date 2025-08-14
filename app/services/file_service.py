@@ -1,9 +1,10 @@
 import hashlib
 import os
+from collections.abc import AsyncGenerator
 
 from fastapi import UploadFile
 from starlette.status import HTTP_200_OK, HTTP_404_NOT_FOUND
-from typing import AsyncGenerator
+
 from app.db.text_db import find_safe_name_by_name, read_text_db, write_text_db
 from app.db.vector_db import create_vector_store, select_vector_store
 from app.utils.langchain_util import create_chunks_to_text, use_chain_clovaX, get_chain_clovaX
@@ -89,6 +90,16 @@ async def get_pdf_file_list() -> tuple[int, str, list[str]]:
 
     return HTTP_200_OK, "리스트 조회 성공", file_names
 
+async def get_file_path_service(name: str) -> str | None:
+    file_basename, _ = os.path.splitext(name)
+    safe_name = await find_safe_name_by_name(name=file_basename)
+    if not safe_name:
+        return None
+
+    file_path = os.path.join(UPLOAD_DIRECTORY, f"{safe_name}.pdf")
+    if os.path.exists(file_path):
+        return file_path
+    return None
 
 async def chat_stream_service(name: str, query: str, session_id : str) -> AsyncGenerator[str, None]:
     chain = await get_chain_clovaX()
@@ -110,8 +121,8 @@ async def chat_stream_service(name: str, query: str, session_id : str) -> AsyncG
 
     async for event in chain.astream(
         {
-            "results" : chunk, 
-            "query" : query,
+            "results": chunk,
+            "query": query,
         }
     ):
         if event and hasattr(event, "content"):
