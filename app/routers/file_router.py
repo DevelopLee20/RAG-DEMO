@@ -35,6 +35,10 @@ async def get_file(file_name: str):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(file_path)
 
+@router.delete("/files/{file_name}")
+async def delete_file(file_name: str):
+    status_code, detail = await file_service.file_delete_service(name=file_name)
+    return BaseResponseModel(status_code=status_code, detail=detail)
 
 @router.get("/stream")
 async def chat_stream(name : str, query :str, session_id :str):

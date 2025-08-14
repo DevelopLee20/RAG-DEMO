@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 const Chat = ({ selectedFile }) => {
   const [query, setQuery] = useState('');
@@ -8,6 +8,14 @@ const Chat = ({ selectedFile }) => {
 
   // 세션 ID를 한 번 생성해서 유지
   const sessionIdRef = useRef(`sess_${Math.random().toString(36).substr(2, 9)}`);
+  const chatContainerRef = useRef(null);
+
+  // 새 메시지가 추가될 때마다 스크롤을 맨 아래로 이동
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -102,11 +110,11 @@ const Chat = ({ selectedFile }) => {
       {messages.length > 0 && (
         <div className="mt-4">
           <h4 className="font-semibold text-gray-800 mb-2">Chat History:</h4>
-          <div className="h-96 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50">
-            <div className="space-y-4">
-              {messages.slice().reverse().map((msg, idx) => (
+          <div ref={chatContainerRef} className="h-96 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50">
+            <div className="flex flex-col space-y-4">
+              {messages.map((msg, idx) => (
                 <div
-                  key={messages.length - 1 - idx}
+                  key={idx}
                   className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div

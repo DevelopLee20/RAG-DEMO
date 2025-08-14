@@ -1,4 +1,5 @@
 import os
+import shutil
 
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
@@ -45,3 +46,23 @@ async def select_vector_store(name: str) -> FAISS | None:
         )
     except Exception as e:
         return None
+
+
+async def delete_vector_store(name: str) -> bool:
+    """벡터 스토어를 삭제하는 함수
+
+    Args:
+        name (str): 삭제할 벡터 스토어 이름
+
+    Returns:
+        bool: 삭제 성공 여부
+    """
+    try:
+        vector_store_path = f"./vector_db/{name}"
+        if os.path.exists(vector_store_path):
+            shutil.rmtree(vector_store_path)
+            return True
+        return False
+    except Exception as e:
+        print(f"Error deleting vector store {name}: {e}")
+        return False

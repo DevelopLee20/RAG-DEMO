@@ -62,6 +62,35 @@ async def write_text_db(name: str, safe_name: str) -> None:
         f.write(new_content)
 
 
+async def delete_text_db(name: str) -> bool:
+    """
+    텍스트 파일 데이터베이스에서 특정 이름을 삭제합니다.
+
+    Args:
+        name: 삭제할 원본 이름입니다.
+
+    Returns:
+        bool: 삭제 성공 여부
+    """
+    try:
+        db_data = await read_text_db()
+        # 삭제할 이름을 제외한 데이터만 유지
+        filtered_data = [entry for entry in db_data if entry[0] != name]
+        
+        # 새로운 내용 생성
+        new_content = ";".join([f"{n},{s}" for n, s in filtered_data])
+        if new_content:
+            new_content += ";"
+
+        with open(DB_FILE_PATH, "w", encoding="utf-8") as f:
+            f.write(new_content)
+        
+        return True
+    except Exception as e:
+        print(f"Error deleting from text db: {e}")
+        return False
+
+
 async def find_safe_name_by_name(name: str) -> str | None:
     """
     주어진 이름에 대한 안전한 이름을 찾습니다.
