@@ -30,8 +30,14 @@ async def get_pdf_file_list() -> ListResponseModel:
 
 
 @router.get("/stream")
-async def chat_stream(name : str, query :str):
+async def chat_stream(name : str, query :str, session_id :str):
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+    }
     return StreamingResponse(
-        file_service.chat_stream_service(name = name, query = query), 
-        media_type = "text/event-stream"
+        file_service.chat_stream_service(name=name, query=query, session_id=session_id),
+        media_type="text/event-stream",
+        headers=headers,
     )
