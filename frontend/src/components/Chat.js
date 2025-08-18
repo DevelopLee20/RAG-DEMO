@@ -39,17 +39,13 @@ const Chat = ({ selectedFile }) => {
       const url = `http://127.0.0.1:8000/chat/stream?name=${encodeURIComponent(selectedFile)}&query=${encodeURIComponent(query)}&session_id=${sessionIdRef.current}`;
       const eventSource = new EventSource(url);
 
-      let aiMessage = ''; // 스트리밍 중인 AI 메시지 누적
-
       eventSource.onmessage = (event) => {
         console.debug('SSE message:', event.data);
         if (event.data === '[DONE]') {
           eventSource.close();
           // 최종 완료 시 로딩 해제만 수행 (실시간으로 이미 메시지를 반영함)
           setIsLoading(false);
-          aiMessage = '';
         } else {
-          aiMessage += event.data;
           // 실시간으로 마지막 AI 메시지 업데이트 (없으면 새로 추가)
           setMessages((prev) => {
             if (prev.length > 0 && prev[prev.length - 1].role === 'ai') {
