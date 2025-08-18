@@ -10,6 +10,7 @@ from starlette.status import HTTP_200_OK, HTTP_404_NOT_FOUND
 from app.db.text_db import TextDB
 from app.db.vector_db import VectorDB
 from app.utils.langchain_util import LangchainUtil
+from app.utils.langfuse_util import LangfuseUtil
 from app.utils.pdf_util import PdfUtil
 
 UPLOAD_DIRECTORY = os.path.abspath(
@@ -165,7 +166,7 @@ async def chat_stream_service(
     accumulated_content: list[str] = []
 
     # 핸들러 불러오기
-    handler = await LangchainUtil.get_langfuse_handler(tags=["RAG"])
+    handler = await LangfuseUtil.get_langfuse_handler(tags=["RAG"])
 
     async for event in chain.astream(
         {

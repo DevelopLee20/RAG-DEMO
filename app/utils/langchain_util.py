@@ -4,15 +4,10 @@ from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_naver import ChatClovaX, ClovaXEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langfuse.callback import CallbackHandler
 
 from app.core.base_models import EvaluationModel
-from app.core.env import (
-    CLOVASTUDIO_API_TOKEN,
-    LANGFUSE_HOST,
-    LANGFUSE_PUBLIC_KEY,
-    LANGFUSE_SECRET_KEY,
-)
+from app.core.env import CLOVASTUDIO_API_TOKEN
+from app.utils.langfuse_util import LangfuseUtil
 
 
 class LangchainUtil:
@@ -134,23 +129,6 @@ class LangchainUtil:
         return cls.chain_clovaX
 
     @classmethod
-    async def get_langfuse_handler(cls, tags: list[str] = None) -> CallbackHandler:
-        """랭퓨즈 클라이언트 반환 함수
-
-        Returns:
-            CallbackHandler: 랭퓨즈 클라이언트 객체
-        """
-        if cls.langfuse_handler is None:
-            cls.langfuse_handler = CallbackHandler(
-                public_key=LANGFUSE_PUBLIC_KEY,
-                secret_key=LANGFUSE_SECRET_KEY,
-                host=LANGFUSE_HOST,
-                tags=tags,
-            )
-
-        return cls.langfuse_handler
-
-    @classmethod
     async def use_chain_clovaX(cls, chunk: list[Document], query: str) -> str:
         """체이닝된 클로바엑스 객체 사용 함수
 
@@ -162,7 +140,7 @@ class LangchainUtil:
             str: 질문에 대한 대답
         """
         chain = await cls.get_chain_clovaX()
-        langfuse_handler = await cls.get_langfuse_handler()
+        langfuse_handler = await LangfuseUtil.get_langfuse_handler()
 
         result = await chain.ainvoke(
             {
@@ -203,7 +181,7 @@ class LangchainUtil:
                 },
             )
 
-            langfuse_handler = await cls.get_langfuse_handler()
+            langfuse_handler = await LangfuseUtil.get_langfuse_handler()
 
             langfuse_handler.langfuse.score(
                 name="eval score",
