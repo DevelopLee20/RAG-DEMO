@@ -2,10 +2,10 @@ from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.documents import Document
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_naver import ChatClovaX, ClovaXEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langfuse.callback import CallbackHandler
+from pydantic import BaseModel, Field
 
 from app.core.env import (
     CLOVASTUDIO_API_TOKEN,
