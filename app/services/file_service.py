@@ -7,12 +7,7 @@ from fastapi import UploadFile
 from langchain_community.chat_message_histories import ChatMessageHistory
 from starlette.status import HTTP_200_OK, HTTP_404_NOT_FOUND
 
-from app.db.text_db import (
-    delete_text_db,
-    find_safe_name_by_name,
-    read_text_db,
-    write_text_db,
-)
+from app.db.text_db import TextDB
 from app.db.vector_db import VectorDB
 from app.utils.langchain_util import LangchainUtil
 from app.utils.pdf_util import PdfUtil
@@ -54,7 +49,7 @@ async def file_upload_service(file: UploadFile) -> tuple[int, str]:
     documents = await LangchainUtil.create_chunks_to_text(parse_text)
 
     # 텍스트 디비에 이름, 안전 이름 쌍 저장
-    await write_text_db(file_basename, safe_folder_name)
+    await TextDB.write_text_db(file_basename, safe_folder_name)
 
     await VectorDB.create_vector_store(name=safe_folder_name, chunks=documents)
 
@@ -70,7 +65,7 @@ async def file_delete_service(name: str) -> tuple[int, str]:
     Returns:
         tuple[int, str]: 상태 코드와 메시지
     """
-    safe_name = await find_safe_name_by_name(name=name)
+    safe_name = await TextDB.find_safe_name_by_name(name=name)
     if not safe_name:
         return HTTP_404_NOT_FOUND, "파일 이름이 존재하지 않습니다."
 
@@ -79,7 +74,7 @@ async def file_delete_service(name: str) -> tuple[int, str]:
         os.remove(file_path)
 
     await VectorDB.delete_vector_store(name=safe_name)
-    await delete_text_db(name=name)
+    await TextDB.delete_text_db(name=name)
 
     return HTTP_200_OK, "삭제 성공"
 
@@ -98,7 +93,7 @@ async def chat_service(
         tuple[int, str]: 상태코드와 메시지
     """
 
-    safe_name = await find_safe_name_by_name(name=name)
+    safe_name = await TextDB.find_safe_name_by_name(name=name)
     vector_store = await VectorDB.select_vector_store(name=safe_name)
 
     if vector_store is None:
@@ -119,7 +114,7 @@ async def chat_service(
 
 
 async def get_pdf_file_list() -> tuple[int, str, list[str]]:
-    db_data = await read_text_db()
+    db_data = await TextDB.read_text_db()
     file_names = [item[0] for item in db_data]
 
     return HTTP_200_OK, "리스트 조회 성공", file_names
@@ -127,7 +122,7 @@ async def get_pdf_file_list() -> tuple[int, str, list[str]]:
 
 async def get_file_path_service(name: str) -> str | None:
     file_basename, _ = os.path.splitext(name)
-    safe_name = await find_safe_name_by_name(name=file_basename)
+    safe_name = await TextDB.find_safe_name_by_name(name=file_basename)
     if not safe_name:
         return None
 
@@ -150,7 +145,7 @@ async def chat_stream_service(
     Yields:
         str: 스트리밍 응답 데이터
     """
-    safe_name = await find_safe_name_by_name(name=name)
+    safe_name = await TextDB.find_safe_name_by_name(name=name)
     vector_store = await VectorDB.select_vector_store(name=safe_name)
     chain = await LangchainUtil.get_chain_clovaX()
 
