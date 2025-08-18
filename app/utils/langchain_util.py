@@ -1,6 +1,8 @@
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.documents import Document
+from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_naver import ChatClovaX, ClovaXEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langfuse.callback import CallbackHandler
@@ -12,9 +14,23 @@ from app.core.env import (
     LANGFUSE_SECRET_KEY,
 )
 
+
+# LLM 평가 결과 파싱을 위한 Pydantic 모델
+class Evaluation(BaseModel):
+    score: float = Field(
+        description="전반적인 답변 품질에 대한 점수 (0.0000-1.0000)",
+        ge=0.0000,
+        le=1.0000,
+    )
+    reason: str = Field(
+        description="각 평가 기준에 대한 구체적인 분석과 점수에 대한 이유를 설명합니다."
+    )
+
+
 splitter = None
 embedding = None
 chain_clovaX = None
+evalate_chain_clovaX = None
 clovaX = None
 langfuse_handler = None
 
@@ -191,3 +207,71 @@ async def add_to_history(session_id: str, query: str, response: str):
     history = get_session_history(session_id)
     history.add_user_message(query)
     history.add_ai_message(response)
+
+
+async def evalate_llm_score(query: str, answer: str, context: str = None) -> None:
+    """LLM의 답변을 평가하고 그 결과를 Langfuse에 기록합니다."""
+    try:
+        # 체이닝된 LLM 모델 불러오기
+        chaining_model = await get_evalate_chaining_model()
+        # 모델을 호출하여 JSON 형식의 평가 결과를 직접 받음
+        json_result = await chaining_model.ainvoke(
+            {
+                "question": query,
+                "llm_answer": answer,
+                "context": context or "제공된 컨텍스트 없음",
+            },
+        )
+
+        langfuse_handler = await get_langfuse_handler()
+
+        langfuse_handler.langfuse.score(
+            name="eval score",
+            value=float(json_result["score"]),
+            comment=json_result["reason"],
+        )
+
+        langfuse_handler.langfuse.flush()
+    except Exception as e:
+        print(f"LLM 답변 평가 중 오류 발생: {e}")
+
+
+async def get_evalate_chaining_model():
+    global evalate_chain_clovaX
+
+    if evalate_chain_clovaX is None:
+        # Pydantic 모델을 기반으로 JSON 출력 파서 생성
+        parser = JsonOutputParser(pydantic_object=Evaluation)
+
+        sys_prompt = """당신은 LLM 모델의 답변을 평가하는 공정하고 엄격한 평가자입니다.
+        당신의 임무는 주어진 [질문], [컨텍스트] 그리고 [LLM 답변]을 바탕으로 LLM 모델의 성능을 평가하는 것입니다.
+        만약 문서에 없는 질문에 대해 '문서에 없음'이라고 답변했다면, 아주 정확한 답변으로 평가합니다.
+
+        다음 평가 기준에 따라 답변을 분석하고 점수를 매겨주세요:
+
+        평가 결과는 JSON 형식으로 제공해야 합니다. JSON 객체는 다음 키를 포함해야 합니다:
+        -   `score`: (정수, 0.0000-1.0000) 전반적인 답변 품질에 대한 점수. 1.0000은 완벽한 답변, 0.0000은 매우 나쁜 답변을 의미합니다.
+        -   `reason`: (문자열) 각 평가 기준에 대한 분석과 점수에 대한 이유를 20자 이내 한 줄로 설명합니다.
+        
+        {format_instructions}
+        """
+
+        user_prompt = """[질문]
+        {question}
+
+        [컨텍스트]
+        {context}
+
+        [LLM 답변]
+        {llm_answer}
+        """
+
+        prompt_template = ChatPromptTemplate.from_messages(
+            messages=[("system", sys_prompt), ("human", user_prompt)]
+        ).partial(format_instructions=parser.get_format_instructions())
+
+        llm_model = await get_clovaX()
+        # 프롬프트, 모델, 파서를 연결하고 전역 변수에 할당하여 캐싱
+        evalate_chain_clovaX = prompt_template | llm_model | parser
+
+    return evalate_chain_clovaX

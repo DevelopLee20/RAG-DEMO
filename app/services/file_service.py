@@ -21,6 +21,7 @@ from app.db.vector_db import (
 from app.utils.langchain_util import (
     add_to_history,
     create_chunks_to_text,
+    evalate_llm_score,
     get_chain_clovaX,
     get_langfuse_handler,
     use_chain_clovaX,
@@ -196,6 +197,8 @@ async def chat_stream_service(
                     await asyncio.sleep(0.02)
 
             # yield f"data: {event.content}\n\n"
+
+    await evalate_llm_score(query=query, answer=event.content, context=chunk)
 
     # ai 답변 저장 (전체 내용)
     full_content = "".join(accumulated_content)
