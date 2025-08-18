@@ -3,6 +3,7 @@ from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_naver import ChatClovaX, ClovaXEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langfuse import Langfuse
 from langfuse.callback import CallbackHandler
 
 from app.core.env import (
@@ -17,6 +18,8 @@ embedding = None
 chain_clovaX = None
 clovaX = None
 langfuse_handler = None
+
+langfuse = Langfuse()
 
 langfuseHandler = CallbackHandler(
     secret_key=LANGFUSE_SECRET_KEY, public_key=LANGFUSE_PUBLIC_KEY, host=LANGFUSE_HOST
@@ -138,6 +141,47 @@ async def get_chain_clovaX():
     return chain_clovaX
 
 
+async def get_eval_clovaX():
+    """클로바엑스 평가 프롬프트 체인 객체 반환 함수
+
+    Returns:
+        Chain: 모델과 프롬프트 체인 객체
+    """
+    global chain_clovaX
+
+    if chain_clovaX is None:
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    """당신은 공정하고 엄격한 평가자입니다. 당신의 임무는 주어진 컨텍스트와 질문을 바탕으로 AI 답변의 품질을 평가하는 것입니다.
+                    다음 기준에 따라 답변을 평가해 주세요:
+                    1.  **충실성(Faithfulness)**: 답변이 [컨텍스트]에 제공된 정보에만 의존하고 있습니까? 컨텍스트에 존재하지 않는 정보를 추가해서는 안 됩니다.
+                    2.  **관련성(Relevance)**: 답변이 [질문]에 직접적이고 완전하게 관련이 있습니까?
+
+                    [질문]
+                    {question}
+
+                    [컨텍스트]
+                    {context}
+
+                    [답변]
+                    {answer}
+
+                    당신의 평가를 바탕으로 점수(score)와 평가 이유(reasoning)를 제공해 주세요.
+                    점수는 반드시 정수여야 합니다: 좋은 답변(충실하고 관련성 높음)은 100, 나쁜 답변(충실하지 않거나 관련성 낮음)은 0입니다.
+                    "score"와 "reasoning"이라는 두 개의 키를 포함하는 JSON 객체로 응답해 주세요.
+                    """,
+                ),
+            ]
+        )
+
+        clova_model = await get_clovaX()
+        chain_clovaX = prompt | clova_model
+
+    return chain_clovaX
+
+
 async def get_langfuse_handler(tags: list[str] = None) -> CallbackHandler:
     """랭퓨즈 클라이언트 반환 함수
 
@@ -191,3 +235,25 @@ async def add_to_history(session_id: str, query: str, response: str):
     history = get_session_history(session_id)
     history.add_user_message(query)
     history.add_ai_message(response)
+
+
+async def evalate_score_from_dataset(dataset_name: str, run_name: str, context: str):
+    dataset = langfuse.get_dataset(name=dataset_name)
+
+    for item in dataset.items:
+        # 콜백 함수 생성
+        handler = item.get_langchain_handler(run_name=run_name)
+
+        my_langchain_chain = await get_chain_clovaX()
+        await my_langchain_chain.ainvoke(
+            {
+                "question": item.input,
+                "context": context,
+                "answer": item.expected_output,
+            },
+            callbacks=[handler],
+        )
+
+        # langfuse.score(value=1, name="test_scoring", handler=handler)
+
+    langfuse.flush()
