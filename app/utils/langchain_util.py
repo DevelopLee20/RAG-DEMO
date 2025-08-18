@@ -195,6 +195,12 @@ async def add_to_history(session_id: str, query: str, response: str):
     history.add_user_message(query)
     history.add_ai_message(response)
 
+async def create_langfuse_dataset(db_name: str):
+    # langfuse 데이터셋 생성
+    langfuse.create_dataset(
+        name = db_name, 
+        description = "데이터 테스트셋"
+    )
 
 async def get_llm_score(trace_id: str, chunk : list[Document], query: str, response: str):
     """생성된 대화 내역에 대한 평가 점수를 저장하는 함수
@@ -218,33 +224,46 @@ async def get_llm_score(trace_id: str, chunk : list[Document], query: str, respo
         output=response
     )
 
-    # LLM을 사용한 자동 평가
-    evaluation_score = await evaluate_response_with_llm(chunk, query, response)
+    # LLM을 사용한 자동 평가 (점수와 평가 이유 함께 반환)
+    print(f"\n{'='*60}")
+    print(f"Trace ID: {trace_id}")
+    print(f"질문: {query}")
+    print(f"응답: {response}")
+    print(f"{'='*60}")
     
-    # 평가 점수를 Langfuse에 저장
+    evaluation_result = await evaluate_response_with_llm(chunk, query, response)
+    evaluation_score = evaluation_result["score"]
+    evaluation_reason = evaluation_result["reason"]
+    
+    # 평가 결과 로그
+    print(f"   점수: {evaluation_score:.2f}/1.0")
+    print(f"   평가 이유: {evaluation_reason}")
+    print(f"{'='*60}\n")
+    
+    # 평가 점수와 이유를 Langfuse에 저장
     trace.score(
         name="correctness",
         value=evaluation_score,
-        comment="LLM-based auto-evaluated correctness score"
+        comment=f"점수: {evaluation_score:.2f}/1.0\n평가 이유: {evaluation_reason}"
     )
 
-async def create_langfuse_dataset(db_name: str):
-    # langfuse 데이터셋 생성
-    langfuse.create_dataset(
-        name = db_name, 
-        description = "데이터 테스트셋"
-    )
+    return evaluation_score
+
+
+
+
 
 # LLM as Judgement 
-async def evaluate_response_with_llm(chunk : list[Document], query: str, response: str) -> float:
+async def evaluate_response_with_llm(chunk : list[Document], query: str, response: str) -> dict:
     """LLM을 사용하여 응답을 평가하는 함수
     
     Args:
+        chunk (list[Document]): 참고 문서
         query (str): 사용자 질문
         response (str): AI 응답
         
     Returns:
-        float: 0.0~1.0 사이의 평가 점수
+        dict: {"score": float, "reason": str} - 평가 점수와 이유
     """
     try:
         clova_model = await get_clovaX()
@@ -252,31 +271,54 @@ async def evaluate_response_with_llm(chunk : list[Document], query: str, respons
         # 직접 메시지 형식으로 평가 요청
         evaluation_messages = [
             {"role": "system", "content": """당신은 AI 응답의 품질을 평가하는 전문가입니다. 
-            문서에서 찾은 내용이 근거로서 적절히 사용되었는지 참고하여 평가해주세요.
-        
+문서에서 찾은 내용이 근거로서 적절히 사용되었는지 참고하여 평가해주세요.
+
 다음 기준으로 0.0~1.0 사이의 점수를 매겨주세요:
 - 0.0-0.3: 응답이 질문과 전혀 관련없거나 잘못된 정보
 - 0.4-0.6: 부분적으로 관련있지만 불완전한 응답
 - 0.7-0.8: 질문에 적절히 답변하지만 개선 여지가 있음
 - 0.9-1.0: 질문에 완벽하게 답변하고 정확한 정보 제공
 
-점수만 숫자로 응답해주세요 (예: 0.8)."""},
-            {"role": "user", "content": f"질문: {query}\n응답: {response}\n 참고: {chunk}\n\n점수:"}
+응답 형식:
+점수: [0.0~1.0 사이의 숫자]
+평가 이유: [점수를 매긴 구체적인 이유와 근거]
+
+예시:
+점수: 0.8
+평가 이유: 응답이 질문과 관련성이 높고, 문서의 내용을 적절히 참조하여 답변했으나, 더 구체적인 세부사항이 포함되면 더 좋을 것 같습니다."""},
+            {"role": "user", "content": f"질문: {query}\n응답: {response}\n참고 문서: {chunk}\n\n평가해주세요:"}
         ]
         
         result = await clova_model.ainvoke(evaluation_messages)
+        print(f"평가 결과: {result.content}")
+        evaluation_text = result.content.strip()
         
-        score_text = result.content.strip()
+        # 점수와 이유 추출
+        score_match = re.search(r'점수:\s*(0\.\d+)', evaluation_text)
+        reason_match = re.search(r'평가 이유:\s*(.+)', evaluation_text, re.DOTALL)
         
-        # 숫자 추출
-        score_match = re.search(r'0\.\d+', score_text)
         if score_match:
-            score = float(score_match.group())
-            return min(max(score, 0.0), 1.0)  # 0.0~1.0 범위로 제한
+            score = float(score_match.group(1))
+            score = min(max(score, 0.0), 1.0)  # 0.0~1.0 범위로 제한
         else:
-            return 0.5  # 기본값
+            score = 0.5  # 기본값
+            
+        if reason_match:
+            reason = reason_match.group(1).strip()
+        else:
+            reason = "평가 이유를 추출할 수 없습니다."
+            
+        return {
+            "score": score,
+            "reason": reason
+        }
+        
     except Exception as e:
         print(f"평가 중 오류 발생: {e}")
-        return 0.5  # 오류 시 기본값
+        return {
+            "score": 0.5,
+            "reason": f"평가 중 오류 발생: {str(e)}"
+        }
 
-
+#async def retry_chain_improved_prompt(original_prompt : str, bad_response: str) :
+    #trace = langfuse.trace(session_id = session_id)

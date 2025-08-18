@@ -203,6 +203,9 @@ async def chat_stream_service(
   
     # langfuse에 score 저장
     trace_id = handler.get_trace_id()
-    await get_llm_score(trace_id, chunk, query, chain)
-
+    await get_llm_score(trace_id, chunk, query, full_content)
+    #if score < 0.6 :
+      #  """ 재실행 프롬프트 실행 
+       # """
+    # print(score)
     yield "data: [DONE]\n\n"
