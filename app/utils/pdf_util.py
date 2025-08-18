@@ -4,7 +4,9 @@ from typing import Any
 
 import PyPDF2
 from fastapi import UploadFile
+from starlette.status import HTTP_200_OK
 
+from app.db.text_db import TextDB
 from app.utils.text_util import TextUtil
 
 
@@ -60,3 +62,31 @@ class PdfUtil:
         await file.seek(0)
         with open(file_path + ".pdf", "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
+
+    @classmethod
+    async def delete_pdf(cls, safe_name: str) -> bool:
+        file_path = os.path.join(cls.UPLOAD_DIRECTORY, f"{safe_name}.pdf")
+
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+            return True
+        except:
+            return False
+
+    @classmethod
+    async def get_pdf_list(cls) -> tuple[int, str, list[str]]:
+        db_data = await TextDB.read_text_db()
+        file_names = [item[0] for item in db_data]
+
+        return HTTP_200_OK, "리스트 조회 성공", file_names
+
+    @classmethod
+    async def select_pdf(cls, safe_name: str) -> str | None:
+        file_path = os.path.join(cls.UPLOAD_DIRECTORY, f"{safe_name}.pdf")
+
+        if os.path.exists(file_path):
+            return file_path
+
+        return None
