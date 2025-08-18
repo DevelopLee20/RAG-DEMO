@@ -23,6 +23,7 @@ from app.utils.langchain_util import (
     create_chunks_to_text,
     get_chain_clovaX,
     get_langfuse_handler,
+    get_llm_score,
     use_chain_clovaX,
 )
 from app.utils.pdf_util import parse_pdf, save_pdf
@@ -117,7 +118,7 @@ async def chat_service(
     chunk = vector_store.similarity_search(query=query)
 
     # AI 응답 생성
-    result = await use_chain_clovaX(chunk=chunk, query=query)
+    result = await use_chain_clovaX(chunk=chunk, query=query, session_id=session_id)
 
     # 히스토리에 추가
     await add_to_history(session_id=session_id, query=query, response=result)
@@ -178,7 +179,7 @@ async def chat_stream_service(
     accumulated_content: list[str] = []
 
     # 핸들러 불러오기
-    handler = await get_langfuse_handler()
+    handler = await get_langfuse_handler(session_id)
 
     async for event in chain.astream(
         {
@@ -190,16 +191,18 @@ async def chat_stream_service(
         },
     ):
         if event and hasattr(event, "content"):
-            for text in event.content:
-                for t in text:
-                    yield f"data: {t}\n\n"
-                    await asyncio.sleep(0.02)
-
-            # yield f"data: {event.content}\n\n"
+            accumulated_content.append(event.content)
+            yield f"data: {event.content}\n\n"
+            await asyncio.sleep(0.02)
 
     # ai 답변 저장 (전체 내용)
     full_content = "".join(accumulated_content)
     if full_content:
         await add_to_history(session_id=session_id, query=query, response=full_content)
+    
+  
+    # langfuse에 score 저장
+    trace_id = handler.get_trace_id()
+    await get_llm_score(trace_id, chunk, query, chain)
 
     yield "data: [DONE]\n\n"
