@@ -26,7 +26,7 @@ from app.utils.langchain_util import (
     get_langfuse_handler,
     use_chain_clovaX,
 )
-from app.utils.pdf_util import parse_pdf, save_pdf
+from app.utils.pdf_util import PdfUtil
 
 UPLOAD_DIRECTORY = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "uploaded_files")
@@ -56,10 +56,10 @@ async def file_upload_service(file: UploadFile) -> tuple[int, str]:
     safe_folder_name = hashlib.sha256(file_basename.encode("utf-8")).hexdigest()
 
     # PDF 파싱
-    parse_text = await parse_pdf(file=file)
+    parse_text = await PdfUtil.parse_pdf(file=file)
 
     # PDF 저장
-    await save_pdf(file=file, safe_name=safe_folder_name)
+    await PdfUtil.save_pdf(file=file, safe_name=safe_folder_name)
 
     # 청킹
     documents = await create_chunks_to_text(parse_text)
