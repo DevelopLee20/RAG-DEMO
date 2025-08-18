@@ -13,11 +13,7 @@ from app.db.text_db import (
     read_text_db,
     write_text_db,
 )
-from app.db.vector_db import (
-    create_vector_store,
-    delete_vector_store,
-    select_vector_store,
-)
+from app.db.vector_db import VectorDB
 from app.utils.langchain_util import LangchainUtil
 from app.utils.pdf_util import PdfUtil
 
@@ -60,7 +56,7 @@ async def file_upload_service(file: UploadFile) -> tuple[int, str]:
     # 텍스트 디비에 이름, 안전 이름 쌍 저장
     await write_text_db(file_basename, safe_folder_name)
 
-    await create_vector_store(name=safe_folder_name, chunks=documents)
+    await VectorDB.create_vector_store(name=safe_folder_name, chunks=documents)
 
     return HTTP_200_OK, "저장 성공"
 
@@ -82,7 +78,7 @@ async def file_delete_service(name: str) -> tuple[int, str]:
     if os.path.exists(file_path):
         os.remove(file_path)
 
-    await delete_vector_store(name=safe_name)
+    await VectorDB.delete_vector_store(name=safe_name)
     await delete_text_db(name=name)
 
     return HTTP_200_OK, "삭제 성공"
@@ -103,7 +99,7 @@ async def chat_service(
     """
 
     safe_name = await find_safe_name_by_name(name=name)
-    vector_store = await select_vector_store(name=safe_name)
+    vector_store = await VectorDB.select_vector_store(name=safe_name)
 
     if vector_store is None:
         return HTTP_404_NOT_FOUND, "벡터 스토어가 존재하지 않습니다."
@@ -155,7 +151,7 @@ async def chat_stream_service(
         str: 스트리밍 응답 데이터
     """
     safe_name = await find_safe_name_by_name(name=name)
-    vector_store = await select_vector_store(name=safe_name)
+    vector_store = await VectorDB.select_vector_store(name=safe_name)
     chain = await LangchainUtil.get_chain_clovaX()
 
     if vector_store is None:
