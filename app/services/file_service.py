@@ -18,14 +18,7 @@ from app.db.vector_db import (
     delete_vector_store,
     select_vector_store,
 )
-from app.utils.langchain_util import (
-    add_to_history,
-    create_chunks_to_text,
-    evalate_llm_score,
-    get_chain_clovaX,
-    get_langfuse_handler,
-    use_chain_clovaX,
-)
+from app.utils.langchain_util import LangchainUtil
 from app.utils.pdf_util import PdfUtil
 
 UPLOAD_DIRECTORY = os.path.abspath(
@@ -62,7 +55,7 @@ async def file_upload_service(file: UploadFile) -> tuple[int, str]:
     await PdfUtil.save_pdf(file=file, safe_name=safe_folder_name)
 
     # 청킹
-    documents = await create_chunks_to_text(parse_text)
+    documents = await LangchainUtil.create_chunks_to_text(parse_text)
 
     # 텍스트 디비에 이름, 안전 이름 쌍 저장
     await write_text_db(file_basename, safe_folder_name)
@@ -118,10 +111,12 @@ async def chat_service(
     chunk = vector_store.similarity_search(query=query)
 
     # AI 응답 생성
-    result = await use_chain_clovaX(chunk=chunk, query=query)
+    result = await LangchainUtil.use_chain_clovaX(chunk=chunk, query=query)
 
     # 히스토리에 추가
-    await add_to_history(session_id=session_id, query=query, response=result)
+    await LangchainUtil.add_to_history(
+        session_id=session_id, query=query, response=result
+    )
 
     # 반환
     return HTTP_200_OK, result
@@ -161,7 +156,7 @@ async def chat_stream_service(
     """
     safe_name = await find_safe_name_by_name(name=name)
     vector_store = await select_vector_store(name=safe_name)
-    chain = await get_chain_clovaX()
+    chain = await LangchainUtil.get_chain_clovaX()
 
     if vector_store is None:
         yield "data: 선택한 파일의 벡터 스토어가 존재하지 않습니다. 파일을 다시 선택하거나 업로드하세요.\n\n"
@@ -179,7 +174,7 @@ async def chat_stream_service(
     accumulated_content: list[str] = []
 
     # 핸들러 불러오기
-    handler = await get_langfuse_handler(tags=["RAG"])
+    handler = await LangchainUtil.get_langfuse_handler(tags=["RAG"])
 
     async for event in chain.astream(
         {
@@ -198,11 +193,15 @@ async def chat_stream_service(
 
             # yield f"data: {event.content}\n\n"
 
-    await evalate_llm_score(query=query, answer=event.content, context=chunk)
+    await LangchainUtil.evalate_llm_score(
+        query=query, answer=event.content, context=chunk
+    )
 
     # ai 답변 저장 (전체 내용)
     full_content = "".join(accumulated_content)
     if full_content:
-        await add_to_history(session_id=session_id, query=query, response=full_content)
+        await LangchainUtil.add_to_history(
+            session_id=session_id, query=query, response=full_content
+        )
 
     yield "data: [DONE]\n\n"
