@@ -5,7 +5,7 @@ from typing import Any
 import PyPDF2
 from fastapi import UploadFile
 
-from app.utils.text_util import preprocessing_text
+from app.utils.text_util import TextUtil
 
 UPLOAD_DIRECTORY = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "uploaded_files")
@@ -33,7 +33,7 @@ async def parse_pdf(file: str | UploadFile) -> list[str]:
 
     for page in PyPDF2.PdfReader(pdf).pages:
         text = page.extract_text()
-        processed_text = preprocessing_text(text=text)
+        processed_text = TextUtil.preprocessing_text(text=text)
 
         parse_list.append(processed_text)
 
