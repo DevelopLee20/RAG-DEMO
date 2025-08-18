@@ -138,7 +138,7 @@ async def get_chain_clovaX():
     return chain_clovaX
 
 
-async def get_langfuse_handler() -> CallbackHandler:
+async def get_langfuse_handler(tags: list[str] = None) -> CallbackHandler:
     """랭퓨즈 클라이언트 반환 함수
 
     Returns:
@@ -151,6 +151,7 @@ async def get_langfuse_handler() -> CallbackHandler:
             public_key=LANGFUSE_PUBLIC_KEY,
             secret_key=LANGFUSE_SECRET_KEY,
             host=LANGFUSE_HOST,
+            tags=tags,
         )
 
     return langfuse_handler

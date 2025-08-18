@@ -178,7 +178,7 @@ async def chat_stream_service(
     accumulated_content: list[str] = []
 
     # 핸들러 불러오기
-    handler = await get_langfuse_handler()
+    handler = await get_langfuse_handler(tags=["RAG"])
 
     async for event in chain.astream(
         {
