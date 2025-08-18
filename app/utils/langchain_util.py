@@ -6,6 +6,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langfuse.callback import CallbackHandler
 from langfuse import Langfuse
 import re
+import asyncio
 
 from app.core.env import (
     CLOVASTUDIO_API_TOKEN,
@@ -182,6 +183,27 @@ async def use_chain_clovaX(chunk: list[Document], query: str, session_id: str) -
     )
     return result.content
 
+async def use_chain_clova_stream(chunk : list[Document], query : str, session_id : str):
+    """
+
+    """
+    chain = await get_chain_clovaX()
+    langfuseHandler = await get_langfuse_handler(session_id)
+    accumulated_content: list[str] = []
+    async for event in chain.astream(
+        {
+            "results": chunk,
+            "query": query,
+        },
+        config={
+            "callbacks": [langfuseHandler],
+        },
+    ) :
+        if event and hasattr(event, "content"):
+            accumulated_content.append(event.content)
+            yield f"data: {event.content}\n\n"  # SSE 메시지 포맷
+            await asyncio.sleep(0.02)
+
 
 async def add_to_history(session_id: str, query: str, response: str):
     """세션 히스토리에 대화 내용을 추가하는 함수
@@ -249,10 +271,6 @@ async def get_llm_score(trace_id: str, chunk : list[Document], query: str, respo
 
     return evaluation_score
 
-
-
-
-
 # LLM as Judgement 
 async def evaluate_response_with_llm(chunk : list[Document], query: str, response: str) -> dict:
     """LLM을 사용하여 응답을 평가하는 함수
@@ -270,27 +288,36 @@ async def evaluate_response_with_llm(chunk : list[Document], query: str, respons
         
         # 직접 메시지 형식으로 평가 요청
         evaluation_messages = [
-            {"role": "system", "content": """당신은 AI 응답의 품질을 평가하는 전문가입니다. 
-문서에서 찾은 내용이 근거로서 적절히 사용되었는지 참고하여 평가해주세요.
+        {"role": "system", "content": """당신은 AI 응답의 품질을 평가하는 전문가입니다. 
+        질문과 AI 응답, 그리고 참고 문서를 기반으로 응답 품질을 점수화해주세요.
 
-다음 기준으로 0.0~1.0 사이의 점수를 매겨주세요:
-- 0.0-0.3: 응답이 질문과 전혀 관련없거나 잘못된 정보
-- 0.4-0.6: 부분적으로 관련있지만 불완전한 응답
-- 0.7-0.8: 질문에 적절히 답변하지만 개선 여지가 있음
-- 0.9-1.0: 질문에 완벽하게 답변하고 정확한 정보 제공
+        점수 산정 기준 (0.0~1.0):
+        - 0.0-0.3: 질문과 관련없거나 틀린 정보 포함
+        - 0.4-0.6: 일부 관련 있지만 불완전, 근거 부족
+        - 0.7-0.8: 질문에 적절히 답변, 근거 충분하지만 세부 내용 부족
+        - 0.9-1.0: 질문에 완벽하게 답변, 정확한 정보 제공, 근거 명확, 문서에서 근거를 찾지 못해 답변할 수 없다고 대답한 경우
 
-응답 형식:
-점수: [0.0~1.0 사이의 숫자]
-평가 이유: [점수를 매긴 구체적인 이유와 근거]
+        점수 산정 체크리스트:
+        1) 질문에 대한 정확한 답변 여부
+        2) 참고 문서 내용과 일치하는지
+        3) 모호하거나 잘못된 정보 포함 여부
 
-예시:
-점수: 0.8
-평가 이유: 응답이 질문과 관련성이 높고, 문서의 내용을 적절히 참조하여 답변했으나, 더 구체적인 세부사항이 포함되면 더 좋을 것 같습니다."""},
-            {"role": "user", "content": f"질문: {query}\n응답: {response}\n참고 문서: {chunk}\n\n평가해주세요:"}
+        응답 형식:
+            점수: [0.0~1.0 사이 숫자]
+            평가 이유: [점수를 매긴 구체적 이유와 근거, 2~3문장]
+
+        예시:
+            점수: 0.8
+            평가 이유: 응답이 질문과 관련성이 높고, 문서 근거를 참조했으나, 일부 세부 정보가 누락되어 완전한 답변은 아님."""},
+        {"role": "user", "content": f"""질문: {query}
+        응답: {response}
+        참고 문서 요약: {chunk}
+
+        위 내용을 기반으로 응답 품질을 평가하고, 점수와 이유를 명확하게 작성해주세요."""}
         ]
         
         result = await clova_model.ainvoke(evaluation_messages)
-        print(f"평가 결과: {result.content}")
+        #print(f"평가 결과: {result.content}")
         evaluation_text = result.content.strip()
         
         # 점수와 이유 추출
@@ -320,5 +347,30 @@ async def evaluate_response_with_llm(chunk : list[Document], query: str, respons
             "reason": f"평가 중 오류 발생: {str(e)}"
         }
 
-#async def retry_chain_improved_prompt(original_prompt : str, bad_response: str) :
-    #trace = langfuse.trace(session_id = session_id)
+async def improve_prompt(original_prompt : str, bad_response: str) -> str:
+
+    model = await get_clovaX()
+
+    fix_request_message = [
+         {
+            "role": "system",
+            "content": """
+            당신은 사용자의 질문을 개선하는 전문가입니다. 
+            이전 답변이 정확하지 않았기 때문에, 더 나은 답변을 이끌어낼 수 있도록 질문을 다시 작성해주세요.
+
+            조건:
+            - 질문은 원래 의도를 유지하되, 더 명확하고 구체적으로 만들어야 합니다.
+            - 불필요한 설명 없이 개선된 질문만 반환하세요.
+            """,
+        },
+        {
+            "role": "user",
+            "content": f"기존 질문: {original_prompt}\n이전 답변: {bad_response}\n\n개선된 질문을 작성해주세요:",
+        },
+    ]
+
+    result = await model.ainvoke(fix_request_message)
+
+    improved_question = result.content.strip()
+
+    return improved_question

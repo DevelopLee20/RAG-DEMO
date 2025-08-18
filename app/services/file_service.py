@@ -24,6 +24,8 @@ from app.utils.langchain_util import (
     get_chain_clovaX,
     get_langfuse_handler,
     get_llm_score,
+    improve_prompt,
+    use_chain_clova_stream,
     use_chain_clovaX,
 )
 from app.utils.pdf_util import parse_pdf, save_pdf
@@ -181,31 +183,32 @@ async def chat_stream_service(
     # 핸들러 불러오기
     handler = await get_langfuse_handler(session_id)
 
-    async for event in chain.astream(
-        {
-            "results": chunk,
-            "query": query,
-        },
-        config={
-            "callbacks": [handler],
-        },
-    ):
-        if event and hasattr(event, "content"):
-            accumulated_content.append(event.content)
-            yield f"data: {event.content}\n\n"
-            await asyncio.sleep(0.02)
+    async for chunk in use_chain_clova_stream(chunk, query, session_id):
+    # SSE 전송용
+        yield chunk
+    # 실제 content만 저장
+        if chunk.startswith("data: "):
+            content = chunk[6:].strip()
+            if content != "[DONE]":
+                accumulated_content.append(content)
+
+    # accumulated_content.append(use_chain_clovaX) = use_chain_clova_stream(chunk, query, session_id)
 
     # ai 답변 저장 (전체 내용)
     full_content = "".join(accumulated_content)
     if full_content:
+        trace_id = handler.get_trace_id()
+        await get_llm_score(trace_id, chunk, query, full_content)
+        #score = await get_llm_score(trace_id, chunk, query, full_content)
+        # 평가 점수가 기준에 미치지 못할 경우
+        #if score < 0.6 :
+        #    improved_query = await improve_prompt(query, full_content)
+        #    use_chain_clova_stream(chunk, improved_query, session_id)
+        #else : 
         await add_to_history(session_id=session_id, query=query, response=full_content)
     
   
     # langfuse에 score 저장
-    trace_id = handler.get_trace_id()
-    await get_llm_score(trace_id, chunk, query, full_content)
-    #if score < 0.6 :
-      #  """ 재실행 프롬프트 실행 
-       # """
-    # print(score)
-    yield "data: [DONE]\n\n"
+   
+      # improved_query를 사용하여 chain.astream 돌리기
+    #yield "data: [DONE]\n\n"
