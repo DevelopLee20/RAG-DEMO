@@ -36,7 +36,7 @@ const Chat = ({ selectedFile }) => {
     setMessages((prev) => [...prev, { role: 'user', content: query }]);
 
     try {
-      const url = `http://127.0.0.1:8000/stream?name=${encodeURIComponent(selectedFile)}&query=${encodeURIComponent(query)}&session_id=${sessionIdRef.current}`;
+      const url = `http://127.0.0.1:8000/chat/stream?name=${encodeURIComponent(selectedFile)}&query=${encodeURIComponent(query)}&session_id=${sessionIdRef.current}`;
       const eventSource = new EventSource(url);
 
       let aiMessage = ''; // 스트리밍 중인 AI 메시지 누적

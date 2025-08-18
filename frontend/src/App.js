@@ -11,7 +11,7 @@ function App() {
 
   const fetchFiles = useCallback(async () => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/list');
+      const response = await fetch('http://127.0.0.1:8000/file/list');
       const data = await response.json();
       if (response.ok) {
         setFiles(data.data || []);
@@ -41,7 +41,7 @@ function App() {
 
   const handleFileDelete = async (fileName) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/files/${fileName}`, {
+      const response = await fetch(`http://127.0.0.1:8000/file/${fileName}`, {
         method: 'DELETE',
       });
       

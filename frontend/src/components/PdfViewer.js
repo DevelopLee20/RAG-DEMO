@@ -18,7 +18,7 @@ const PdfViewer = ({ file }) => {
     return <div className="text-center text-gray-500">Select a PDF file to view.</div>;
   }
 
-  const fileUrl = `http://127.0.0.1:8000/files/${encodeURIComponent(file)}`;
+  const fileUrl = `http://127.0.0.1:8000/file/${encodeURIComponent(file)}`;
 
   return (
     <div className="pdf-viewer-container" style={{ maxHeight: '600px', overflowY: 'auto', border: '1px solid #ccc' }}>

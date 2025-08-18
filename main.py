@@ -2,6 +2,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.routers.chat_router import router as c_router
 from app.routers.file_router import router as f_router
 
 app = FastAPI()
@@ -15,6 +16,7 @@ app.add_middleware(
 )
 
 app.include_router(router=f_router)
+app.include_router(router=c_router)
 
 
 @app.get("/")
