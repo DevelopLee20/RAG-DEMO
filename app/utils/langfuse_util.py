@@ -22,3 +22,16 @@ class LangfuseUtil:
             )
 
         return cls.langfuse_handler
+
+    @classmethod
+    async def set_langfuse_score(
+        cls, value: float, comment: str, name: str = "evalating score"
+    ) -> None:
+        langfuse_handler = await cls.get_langfuse_handler()
+
+        langfuse_handler.langfuse.score(
+            name=name,
+            value=value,
+            comment=comment,
+        )
+        langfuse_handler.langfuse.flush()

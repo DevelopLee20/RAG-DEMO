@@ -16,7 +16,6 @@ class LangchainUtil:
     chain_clovaX = None
     evalate_chain_clovaX = None
     clovaX = None
-    langfuse_handler = None
     chat_store_dict: dict[str, ChatMessageHistory] = {}  # 채팅 히스토리 저장용
 
     @classmethod
@@ -181,15 +180,12 @@ class LangchainUtil:
                 },
             )
 
-            langfuse_handler = await LangfuseUtil.get_langfuse_handler()
-
-            langfuse_handler.langfuse.score(
-                name="eval score",
+            # 랭퓨즈 점수 업데이트
+            await LangfuseUtil.set_langfuse_score(
                 value=float(json_result["score"]),
                 comment=json_result["reason"],
             )
 
-            langfuse_handler.langfuse.flush()
         except Exception as e:
             print(f"LLM 답변 평가 중 오류 발생: {e}")
 
