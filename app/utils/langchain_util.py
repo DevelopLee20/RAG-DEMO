@@ -101,6 +101,26 @@ async def get_clovaX() -> ChatClovaX:
 
     return clovaX
 
+async def get_langfuse_handler(session_id: str) -> CallbackHandler:
+    """랭퓨즈 클라이언트 반환 함수
+
+    Args:
+        session_id (str): 세션 ID
+
+    Returns:
+        CallbackHandler: 랭퓨즈 클라이언트 객체
+    """
+    global langfuseHandlers
+
+    if session_id not in langfuseHandlers:
+        langfuseHandlers[session_id] = CallbackHandler(
+            public_key=LANGFUSE_PUBLIC_KEY,
+            secret_key=LANGFUSE_SECRET_KEY,
+            host=LANGFUSE_HOST,
+            session_id=session_id
+        )
+
+    return langfuseHandlers[session_id]
 
 async def get_chain_clovaX():
     """클로바엑스 프롬프트 체인 객체 반환 함수
@@ -138,27 +158,6 @@ async def get_chain_clovaX():
     return chain_clovaX
 
 
-async def get_langfuse_handler(session_id: str) -> CallbackHandler:
-    """랭퓨즈 클라이언트 반환 함수
-
-    Args:
-        session_id (str): 세션 ID
-
-    Returns:
-        CallbackHandler: 랭퓨즈 클라이언트 객체
-    """
-    global langfuseHandlers
-
-    if session_id not in langfuseHandlers:
-        langfuseHandlers[session_id] = CallbackHandler(
-            public_key=LANGFUSE_PUBLIC_KEY,
-            secret_key=LANGFUSE_SECRET_KEY,
-            host=LANGFUSE_HOST,
-            session_id=session_id
-        )
-
-    return langfuseHandlers[session_id]
-
 
 async def use_chain_clovaX(chunk: list[Document], query: str, session_id: str) -> str:
     """체이닝된 클로바엑스 객체 사용 함수
@@ -183,12 +182,21 @@ async def use_chain_clovaX(chunk: list[Document], query: str, session_id: str) -
     )
     return result.content
 
-async def use_chain_clova_stream(chunk : list[Document], query : str, session_id : str):
-    """
 
+async def use_chain_clova_stream(chunk : list[Document], query : str, session_id : str):
+    """ 클로바 랭체인 스트리밍 형식 출력 함수
+
+    Args:
+          chunk (list[Document]): 가장 유사도 높은 청크
+          query (str): 질문
+          session_id: 세션 ID
+
+    Returns:
+        
     """
     chain = await get_chain_clovaX()
     langfuseHandler = await get_langfuse_handler(session_id)
+    
     accumulated_content: list[str] = []
     async for event in chain.astream(
         {
@@ -266,7 +274,7 @@ async def get_llm_score(trace_id: str, chunk : list[Document], query: str, respo
     trace.score(
         name="correctness",
         value=evaluation_score,
-        comment=f"점수: {evaluation_score:.2f}/1.0\n평가 이유: {evaluation_reason}"
+        comment=evaluation_reason
     )
 
     return evaluation_score
@@ -283,94 +291,109 @@ async def evaluate_response_with_llm(chunk : list[Document], query: str, respons
     Returns:
         dict: {"score": float, "reason": str} - 평가 점수와 이유
     """
+
     try:
         clova_model = await get_clovaX()
         
         # 직접 메시지 형식으로 평가 요청
         evaluation_messages = [
-        {"role": "system", "content": """당신은 AI 응답의 품질을 평가하는 전문가입니다. 
-        질문과 AI 응답, 그리고 참고 문서를 기반으로 응답 품질을 점수화해주세요.
+        {"role": "system", "content": """당신은 RAG 응답의 품질을 평가하는 전문가입니다. 
+        질문과 RAG 응답, 그리고 참고 문서를 기반으로 응답 품질을 점수화해주세요.
+        
+        - 사용자 질문 : {query}
+        - RAG 모델 응답 : {response}
+        - 참고 자료 : {chunk}
 
-        점수 산정 기준 (0.0~1.0):
-        - 0.0-0.3: 질문과 관련없거나 틀린 정보 포함
-        - 0.4-0.6: 일부 관련 있지만 불완전, 근거 부족
-        - 0.7-0.8: 질문에 적절히 답변, 근거 충분하지만 세부 내용 부족
-        - 0.9-1.0: 질문에 완벽하게 답변, 정확한 정보 제공, 근거 명확, 문서에서 근거를 찾지 못해 답변할 수 없다고 대답한 경우
+        다음 기준을 따라 평가하세요:
 
-        점수 산정 체크리스트:
-        1) 질문에 대한 정확한 답변 여부
-        2) 참고 문서 내용과 일치하는지
-        3) 모호하거나 잘못된 정보 포함 여부
+            1. 질문에 대한 **정확한 정보가 문서에 포함되어 있는 경우**, 모델 응답이 해당 정보를 **정확히 반영하고 왜곡 없이 요약 또는 인용했는지** 평가하세요.
 
+            2. 질문에 대한 정보가 **문서에 존재하지 않는 경우**, 아래 두 가지 중 하나면 정확한 응답으로 간주하고 **정확도 점수 1.00**을 부여하세요:
+            - 모델이 "문서에 없음" 또는 이와 동등한 표현으로 답한 경우
+            - 모델이 **응답하지 않았으며**, 이는 문서에 정보가 없기 때문이라고 판단되는 경우
+
+            3. 반대로, 문서에 정보가 없음에도 불구하고 모델이 **추측으로 답변한 경우**, 정확도 점수는 낮아야 합니다 (예: 0.0 ~ 0.3).
+            
         응답 형식:
             점수: [0.0~1.0 사이 숫자]
             평가 이유: [점수를 매긴 구체적 이유와 근거, 2~3문장]
 
         예시:
             점수: 0.8
-            평가 이유: 응답이 질문과 관련성이 높고, 문서 근거를 참조했으나, 일부 세부 정보가 누락되어 완전한 답변은 아님."""},
-        {"role": "user", "content": f"""질문: {query}
-        응답: {response}
-        참고 문서 요약: {chunk}
-
-        위 내용을 기반으로 응답 품질을 평가하고, 점수와 이유를 명확하게 작성해주세요."""}
+            평가 이유: 응답이 질문과 관련성이 높고, 문서 근거를 참조했으나, 일부 세부 정보가 누락되어 완전한 답변은 아님.
+            
+        예시 : 
+            점수 : 1.0
+            평가 이유: 질문에 대해 참고 문서에서 답을 찾을 수 없음을 명확히 알렸음. 문서 근거가 없다는 사실을 정확히 안내했으므로 완벽한 대응으로 평가됨.    
+        """},
+        
+        {"role": "user", "content": f"""사용자 질문 : {query}
+        RAG 모델 응답 : {response}
+        참고 자료: {chunk}
+        """}
         ]
         
+        # 모델 호출
         result = await clova_model.ainvoke(evaluation_messages)
-        #print(f"평가 결과: {result.content}")
         evaluation_text = result.content.strip()
         
-        # 점수와 이유 추출
-        score_match = re.search(r'점수:\s*(0\.\d+)', evaluation_text)
-        reason_match = re.search(r'평가 이유:\s*(.+)', evaluation_text, re.DOTALL)
-        
+        # 점수와 평가 이유 추출
+        score_match = re.search(r'점수:\s*([01](?:\.\d+)?)', evaluation_text)
         if score_match:
-            score = float(score_match.group(1))
-            score = min(max(score, 0.0), 1.0)  # 0.0~1.0 범위로 제한
+            try:
+                score = float(score_match.group(1))
+                score = min(max(score, 0.0), 1.0)  # 0~1 범위로 제한
+            except ValueError:
+                score = 0.4
         else:
-            score = 0.5  # 기본값
-            
+            score = 0.4
+
+        # 이유 추출
+        reason_match = re.search(r'평가 이유:\s*(.+)', evaluation_text, re.DOTALL)
         if reason_match:
             reason = reason_match.group(1).strip()
         else:
             reason = "평가 이유를 추출할 수 없습니다."
-            
+
+        # 결과 반환
         return {
             "score": score,
             "reason": reason
         }
-        
+          
     except Exception as e:
         print(f"평가 중 오류 발생: {e}")
         return {
-            "score": 0.5,
+            "score": 0.4,
             "reason": f"평가 중 오류 발생: {str(e)}"
         }
 
-async def improve_prompt(original_prompt : str, bad_response: str) -> str:
-
+async def improve_prompt(original_prompt: str) -> str:
     model = await get_clovaX()
 
-    fix_request_message = [
-         {
-            "role": "system",
-            "content": """
-            당신은 사용자의 질문을 개선하는 전문가입니다. 
-            이전 답변이 정확하지 않았기 때문에, 더 나은 답변을 이끌어낼 수 있도록 질문을 다시 작성해주세요.
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+            """당신은 사용자의 질문을 가능한 한 원래 의도에 맞게 개선하는 전문가입니다.
+            LLM 모델이 정확한 응답을 제공할 수 있도록, 질문을 최소한으로 다듬어 명확하게 만들어 주세요.
 
             조건:
-            - 질문은 원래 의도를 유지하되, 더 명확하고 구체적으로 만들어야 합니다.
-            - 불필요한 설명 없이 개선된 질문만 반환하세요.
-            """,
-        },
-        {
-            "role": "user",
-            "content": f"기존 질문: {original_prompt}\n이전 답변: {bad_response}\n\n개선된 질문을 작성해주세요:",
-        },
-    ]
+            - 원래 질문의 의도를 반드시 유지해야 합니다.
+            - 불필요한 변형, 추론 추가, 재작성은 피하세요.
+            - 문법, 표현, 모호한 부분만 정리하고, 핵심 내용은 그대로 둡니다.
+            - 개선된 질문만 반환하세요.
+                """,
+            ),
+            (
+                "human",
+                "기존 질문: {original_prompt}\n\n개선된 질문을 작성해주세요:",
+            ),
+        ]
+    )
 
-    result = await model.ainvoke(fix_request_message)
+    # 프롬프트를 구성해서 모델에 전달
+    chain = prompt | model
+    result = await chain.ainvoke({"original_prompt": original_prompt})
 
-    improved_question = result.content.strip()
-
-    return improved_question
+    return result.content

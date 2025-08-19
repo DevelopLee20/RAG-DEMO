@@ -27,6 +27,7 @@ from app.utils.langchain_util import (
     improve_prompt,
     use_chain_clova_stream,
     use_chain_clovaX,
+    improve_prompt
 )
 from app.utils.pdf_util import parse_pdf, save_pdf
 
@@ -183,10 +184,13 @@ async def chat_stream_service(
     # 핸들러 불러오기
     handler = await get_langfuse_handler(session_id)
 
+    # 사용자 질문 개선
+    query = await improve_prompt(query)
+
     async for chunk in use_chain_clova_stream(chunk, query, session_id):
-    # SSE 전송용
+        # SSE 전송용
         yield chunk
-    # 실제 content만 저장
+        # 실제 content만 저장
         if chunk.startswith("data: "):
             content = chunk[6:].strip()
             if content != "[DONE]":
