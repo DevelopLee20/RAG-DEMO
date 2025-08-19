@@ -202,17 +202,20 @@ async def chat_stream_service(
     full_content = "".join(accumulated_content)
     if full_content:
         trace_id = handler.get_trace_id()
-        await get_llm_score(trace_id, chunk, query, full_content)
-        #score = await get_llm_score(trace_id, chunk, query, full_content)
+        #await get_llm_score(trace_id, chunk, query, full_content)
+        score = await get_llm_score(trace_id, chunk, query, full_content)
+        await add_to_history(session_id=session_id, query=query, response=full_content)
+
         # 평가 점수가 기준에 미치지 못할 경우
-        #if score < 0.6 :
+        if score < 0.6 :
+            print("**점수미달***")
+
         #    improved_query = await improve_prompt(query, full_content)
         #    use_chain_clova_stream(chunk, improved_query, session_id)
         #else : 
-        await add_to_history(session_id=session_id, query=query, response=full_content)
     
   
     # langfuse에 score 저장
    
       # improved_query를 사용하여 chain.astream 돌리기
-    #yield "data: [DONE]\n\n"
+    yield "data: [DONE]\n\n"

@@ -8,6 +8,8 @@ from langfuse import Langfuse
 import re
 import asyncio
 
+from app.utils.answer_prompt import ANSWER_PROMPT, QUERY_IMPROVE_PROMPT, SCORE_PROMPT
+
 from app.core.env import (
     CLOVASTUDIO_API_TOKEN,
     LANGFUSE_HOST,
@@ -133,21 +135,7 @@ async def get_chain_clovaX():
     if chain_clovaX is None:
         prompt = ChatPromptTemplate.from_messages(
             [
-                (
-                    "system",
-                    """아래 순서에 따라 사용자의 질문에 답변해주세요.
-                    1. [Context]를 참고해서 사용자의 질문에 대한 답을 생성해주세요.
-                    2. 1에서 생성한 답이 문서에 존재하는지 검토 후 답변해주세요.
-                    3. 2에서 생성한 답이 질문에 대한 올바른 대답인지 검토 후 답변해주세요.
-
-                    조건
-                    - 가능한 단답형으로 대답해주세요.
-                    - 만약 3에서 생성한 답이 문서에 존재하지 않는다면 "문서에 없음" 이라고 답변해주세요.
-
-                    [Context]
-                    {results}
-                    """,
-                ),
+                ( "system", ANSWER_PROMPT),
                 ("human", "질문: {query}"),
             ]
         )
@@ -192,6 +180,7 @@ async def use_chain_clova_stream(chunk : list[Document], query : str, session_id
           session_id: 세션 ID
 
     Returns:
+        event.content: AI 응답
         
     """
     chain = await get_chain_clovaX()
@@ -248,19 +237,13 @@ async def get_llm_score(trace_id: str, chunk : list[Document], query: str, respo
     trace = langfuse.trace(id=trace_id)
 
     # Langfuse v2에서는 generation 대신 span을 사용
-    span = trace.span(
+    trace.span(
         name="auto evaluation", 
         input=query, 
         output=response
     )
 
-    # LLM을 사용한 자동 평가 (점수와 평가 이유 함께 반환)
-    print(f"\n{'='*60}")
-    print(f"Trace ID: {trace_id}")
-    print(f"질문: {query}")
-    print(f"응답: {response}")
-    print(f"{'='*60}")
-    
+    # LLM을 사용한 자동 평가 (점수와 평가 이유 함께 반환)    
     evaluation_result = await evaluate_response_with_llm(chunk, query, response)
     evaluation_score = evaluation_result["score"]
     evaluation_reason = evaluation_result["reason"]
@@ -297,36 +280,7 @@ async def evaluate_response_with_llm(chunk : list[Document], query: str, respons
         
         # 직접 메시지 형식으로 평가 요청
         evaluation_messages = [
-        {"role": "system", "content": """당신은 RAG 응답의 품질을 평가하는 전문가입니다. 
-        질문과 RAG 응답, 그리고 참고 문서를 기반으로 응답 품질을 점수화해주세요.
-        
-        - 사용자 질문 : {query}
-        - RAG 모델 응답 : {response}
-        - 참고 자료 : {chunk}
-
-        다음 기준을 따라 평가하세요:
-
-            1. 질문에 대한 **정확한 정보가 문서에 포함되어 있는 경우**, 모델 응답이 해당 정보를 **정확히 반영하고 왜곡 없이 요약 또는 인용했는지** 평가하세요.
-
-            2. 질문에 대한 정보가 **문서에 존재하지 않는 경우**, 아래 두 가지 중 하나면 정확한 응답으로 간주하고 **정확도 점수 1.00**을 부여하세요:
-            - 모델이 "문서에 없음" 또는 이와 동등한 표현으로 답한 경우
-            - 모델이 **응답하지 않았으며**, 이는 문서에 정보가 없기 때문이라고 판단되는 경우
-
-            3. 반대로, 문서에 정보가 없음에도 불구하고 모델이 **추측으로 답변한 경우**, 정확도 점수는 낮아야 합니다 (예: 0.0 ~ 0.3).
-            
-        응답 형식:
-            점수: [0.0~1.0 사이 숫자]
-            평가 이유: [점수를 매긴 구체적 이유와 근거, 2~3문장]
-
-        예시:
-            점수: 0.8
-            평가 이유: 응답이 질문과 관련성이 높고, 문서 근거를 참조했으나, 일부 세부 정보가 누락되어 완전한 답변은 아님.
-            
-        예시 : 
-            점수 : 1.0
-            평가 이유: 질문에 대해 참고 문서에서 답을 찾을 수 없음을 명확히 알렸음. 문서 근거가 없다는 사실을 정확히 안내했으므로 완벽한 대응으로 평가됨.    
-        """},
-        
+        {"role": "system", "content": SCORE_PROMPT},
         {"role": "user", "content": f"""사용자 질문 : {query}
         RAG 모델 응답 : {response}
         참고 자료: {chunk}
@@ -369,22 +323,20 @@ async def evaluate_response_with_llm(chunk : list[Document], query: str, respons
         }
 
 async def improve_prompt(original_prompt: str) -> str:
+    """사용자 질문 쿼리 개선 함수
+
+    Args: 
+        original_prompt: 기존 사용자 질의문
+    
+    Returns: 
+        result.content: 개선된 사용자 질의문
+
+    """
     model = await get_clovaX()
 
     prompt = ChatPromptTemplate.from_messages(
         [
-            (
-                "system",
-            """당신은 사용자의 질문을 가능한 한 원래 의도에 맞게 개선하는 전문가입니다.
-            LLM 모델이 정확한 응답을 제공할 수 있도록, 질문을 최소한으로 다듬어 명확하게 만들어 주세요.
-
-            조건:
-            - 원래 질문의 의도를 반드시 유지해야 합니다.
-            - 불필요한 변형, 추론 추가, 재작성은 피하세요.
-            - 문법, 표현, 모호한 부분만 정리하고, 핵심 내용은 그대로 둡니다.
-            - 개선된 질문만 반환하세요.
-                """,
-            ),
+            ("system", QUERY_IMPROVE_PROMPT),
             (
                 "human",
                 "기존 질문: {original_prompt}\n\n개선된 질문을 작성해주세요:",
@@ -397,3 +349,5 @@ async def improve_prompt(original_prompt: str) -> str:
     result = await chain.ainvoke({"original_prompt": original_prompt})
 
     return result.content
+
+#async def 
