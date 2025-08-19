@@ -36,7 +36,7 @@ const Chat = ({ selectedFile }) => {
     setMessages((prev) => [...prev, { role: 'user', content: query }]);
 
     try {
-      const url = `http://127.0.0.1:8000/chat/stream?name=${encodeURIComponent(selectedFile)}&query=${encodeURIComponent(query)}&session_id=${sessionIdRef.current}`;
+      const url = `${process.env.REACT_APP_API_URL}/chat/stream?name=${encodeURIComponent(selectedFile)}&query=${encodeURIComponent(query)}&session_id=${sessionIdRef.current}`;
       const eventSource = new EventSource(url);
 
       eventSource.onmessage = (event) => {
