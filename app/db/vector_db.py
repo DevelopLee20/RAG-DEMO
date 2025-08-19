@@ -8,7 +8,7 @@ from app.utils.langchain_util import LangchainUtil
 
 
 class VectorDB:
-    vector_store = None
+    # vector_store = None
 
     @classmethod
     async def create_vector_store(cls, name: str, chunks: list[Document]):
@@ -19,17 +19,17 @@ class VectorDB:
             chunks (list[Document]): 청크(Documents)
             embedding (ClovaXEmbeddings): 임베딩 객체
         """
-        if cls.vector_store is None:
-            cls.vector_store = FAISS.from_documents(
+        os.makedirs("./vector_db/", exist_ok=True)
+
+        vector_store = await cls.select_vector_store(name)
+        if vector_store is None:
+            vector_store = FAISS.from_documents(
                 documents=chunks,
                 embedding=await LangchainUtil.get_embedding(),
-            )
-
-        os.makedirs("./vector_db/", exist_ok=True)
-        cls.vector_store.save_local("./vector_db/" + name)
+            ).save_local("./vector_db/" + name)
 
     @staticmethod
-    async def select_vector_store(name: str) -> FAISS | None:
+    async def select_vector_store(safe_name: str) -> FAISS | None:
         """벡터 스토어를 불러오는 함수
 
         Args:
@@ -40,7 +40,7 @@ class VectorDB:
         """
         try:
             return FAISS.load_local(
-                "./vector_db/" + name,
+                "./vector_db/" + safe_name,
                 await LangchainUtil.get_embedding(),
                 allow_dangerous_deserialization=True,  # pickle 파일 로드 허용
             )

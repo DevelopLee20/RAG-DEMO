@@ -32,6 +32,9 @@ class FileService:
         # PDF 파싱
         parse_text = await PdfUtil.parse_pdf(file=file)
 
+        if not parse_text:
+            return HTTP_500_INTERNAL_SERVER_ERROR, "PDF 파싱이 불가한 문서입니다."
+
         # PDF 저장
         await PdfUtil.save_pdf(file=file, safe_name=safe_folder_name)
 

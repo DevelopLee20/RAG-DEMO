@@ -30,7 +30,7 @@ class ChatService:
         safe_name = await TextDB.find_safe_name_by_name(name=name)
 
         # 벡터 스토어 검색
-        vector_store = await VectorDB.select_vector_store(name=safe_name)
+        vector_store = await VectorDB.select_vector_store(safe_name)
         if vector_store is None:
             return HTTP_404_NOT_FOUND, "벡터 스토어가 존재하지 않습니다."
 
@@ -63,7 +63,7 @@ class ChatService:
             str: 스트리밍 응답 데이터
         """
         safe_name = await TextDB.find_safe_name_by_name(name=name)
-        vector_store = await VectorDB.select_vector_store(name=safe_name)
+        vector_store = await VectorDB.select_vector_store(safe_name)
         chain = await LangchainUtil.get_chain_clovaX()
 
         if vector_store is None:
