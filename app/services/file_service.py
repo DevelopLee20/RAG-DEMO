@@ -27,6 +27,7 @@ class FileService:
         """
         # 저장 이름 설정
         file_basename, _ = os.path.splitext(file.filename)
+        file_basename = file_basename.replace(",", "_").replace(" ", "_")
         safe_folder_name = hashlib.sha256(file_basename.encode("utf-8")).hexdigest()
 
         # PDF 파싱
